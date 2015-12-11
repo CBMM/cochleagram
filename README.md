@@ -20,7 +20,7 @@ Tools for psychoacoustics
 
 - Template matching in spectrogram
 
-- Auditory scene / texture / cepstrum analysis
+- Auditory scene / texture / cepstra analysis
 
 - Sound generation & playback from scene statistics
 
@@ -54,3 +54,25 @@ Tools for psychoacoustics
 - [Neurons](http://ncase.me/neurons/) Nicky Case
 
 - [Parable of the Polygons](http://ncase.me/polygons/) Nicky Case
+
+### Brainstorming session with McDermott lab
+
+- Demo walking through mechanism of generating cochleagram and connection to auditory system. Show traveling wave in basalar membrane. (Sam)
+
+- How hard to specify (how many dimensions) (how many sliders) for parametizing cochleagram.
+
+- Export figures
+
+- Javascript NN?
+
+- Other ways of visualizing sound than spectrograms?
+
+- Code box to change the signal?
+
+- Online training in some way or another (reverse correlation?)
+
+- Provide filters to the thing.
+
+- Sliding correlation matrix.
+
+
