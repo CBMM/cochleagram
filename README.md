@@ -47,6 +47,8 @@ Tools for psychoacoustics
 
 - [MathBox](https://acko.net/blog/mathbox2/) Web math visualization
 
+- [Pandoc](http://pandoc.org) Generate [slides](http://web.mit.edu/greghale/Public/thesis/build/index.html) from [markdown](https://github.com/imalsogreg/RetroProject/blob/master/thesis/thesis.org)
+
 - [Explorable Explanations](http://explorableexplanations.com/)
 
 - [Neurons](http://ncase.me/neurons/) Nicky Case
