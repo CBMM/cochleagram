@@ -1,0 +1,3 @@
+[submodule "deps/reflex-dom"]
+	path = deps/reflex-dom
+	url = http://github.com/imalsogreg/reflex-dom
