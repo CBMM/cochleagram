@@ -1,3 +1,4 @@
+{-# LANGUAGE JavaScriptFFI #-}
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -23,6 +24,7 @@ import GHCJS.DOM.AudioTrackList
 import GHCJS.DOM.OscillatorNode
 import GHCJS.DOM.HTMLCanvasElement
 import GHCJS.DOM.CanvasRenderingContext2D
+import GHCJS.DOM.ImageData
 import GHCJS.DOM.Types
 import GHCJS.DOM.Enums
 import qualified JavaScript.Web.Canvas as C
@@ -42,19 +44,29 @@ main = mainWidget main'
 main' :: MonadWidget t m => m ()
 main' = do
   pb <- getPostBuild
-  freqTxt <- value <$> textInput def
+  --freqTxt <- value <$> textInput def
+  fInput <- textInput $ def & textInputConfig_inputType .~ "range"
+                            & attributes .~ constDyn (   "min"  =: "500"
+                                                      <> "max"  =: "2000"
+                                                      <> "step" =: "0.01")
+
   gInput <- textInput $ def & textInputConfig_inputType .~ "range"
                             & attributes .~ constDyn (   "min"  =: "0"
                                                       <> "max"  =: "1"
                                                       <> "step" =: "0.01")
+  let freqs = fmap ((\(x :: Int) -> (x, show x)) . floor . ((2 :: Double) ^^)) [(5 :: Int) ..11] :: [(Int,String)]
+  fftLen <- dropdown 2048 (constDyn (Data.Map.fromList freqs)) def
   c <- liftIO newAudioContext
-  let freq = fmapMaybe readMaybe (updated freqTxt)
+  let freq = fmapMaybe readMaybe (updated (value fInput))
   osc <- oscillatorNode c (OscillatorNodeConfig 440 freq)
-  g   <- gain c (GainConfig 1 (fmapMaybe readMaybe (updated (value gInput))))
+  g   <- gain c (GainConfig 0.1 (fmapMaybe readMaybe (updated (value gInput))))
+  analyser <- analyserNode c def { _analyserNodeConfig_initial_smoothingTimeConstant = 0
+                                 , _analyserNodeConfig_change_fftSize = updated (value fftLen)}
   liftIO $ do
     connect osc (Just g) 0 0
     Just dest <- getDestination c
     connect g (Just dest) 0 0
+    connect g (Just (_analyser_node analyser)) 0 0
     start osc 0
   text "Hello"
   canvEl <- fmap (castToHTMLCanvasElement . _el_element . fst) $
@@ -75,7 +87,14 @@ main' = do
   performEvent (ffor clicks' $ \_ -> liftIO $ shiftAppendColumn ctx')
   t0 <- liftIO Data.Time.getCurrentTime
   ticks <- tickLossy 0.015 t0
-  performEvent (ffor ticks $ \_ -> liftIO $ shiftAppendColumn ctx')
+  spectra <- _analyser_getByteFrequencyData analyser (() <$ ticks)
+  performEvent (ffor spectra $ \a -> liftIO $ do
+                    a' <- js_clampUint8Array a
+                    img <- js_toGrayscale a'
+                    l <- js_lengthUint8ClampedArray' img
+                    imgData <- newImageData (Just img) 1 (fromIntegral $ l `div` 4)
+                    shiftAppendColumn ctx'
+                    putImageData ctx' (Just imgData) 290 0)
 
   el "br" $ return ()
   text "end"
@@ -104,12 +123,22 @@ shiftAppendColumn ctx = do
 squeezeAppendColumn :: CanvasRenderingContext2D -> HTMLCanvasElement -> IO ()
 squeezeAppendColumn ctx canv = do
   save ctx
-  scale ctx 0.99 1
+  scale ctx (299/300) 1
   drawImageFromCanvas ctx (Just canv) 0 0
   restore ctx
-  -- scale ctx 0.9 1
-  -- Just d <- getImageData ctx 0 0 350 150
-  -- save ctx
-  -- putImageData ctx (Just d) 0 0
-  -- restore ctx
 
+-- toGrayscale :: Uint8ClampedArray -> IO Uint8ClampedArray
+-- toGrayscale x = do
+--   n <- js_lengthUint8ClampedArray x
+--   r <- js_createUint8ClampedArray (n*4)
+--   forM [0..n-1] $ \i -> do
+
+foreign import javascript unsafe
+ "$r = new Uint8ClampedArray(($1).length * 4); for (var i = 0; i < ($1).length; i++) { var i0 = i*4; ($r)[i0] = ($1)[i]; ($r)[i0+1] = ($r)[i0]; ($r)[i0+2] = ($r)[i0]; ($r)[i0+3] = 255;}"
+  js_toGrayscale :: Uint8ClampedArray -> IO Uint8ClampedArray
+
+foreign import javascript unsafe "console.log(($1).data[0])"
+  print' :: ImageData -> IO ()
+-- foreign import unsafe "new Uint8ClampedArray()"
+-- js_toGrayscale :: Uint8ClampedArray -> Uint8ClampedArray
+-- js_toGrayscale

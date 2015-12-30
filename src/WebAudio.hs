@@ -1,14 +1,19 @@
-{-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE EmptyDataDecls #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
 #ifdef __GHCJS__
 {-# LANGUAGE JavaScriptFFI #-}
 #endif
 
 module WebAudio where
 
+import qualified JavaScript.Array as JA
+import qualified JavaScript.TypedArray as TA
+import JavaScript.TypedArray.Internal
 import GHCJS.Foreign
+import GHCJS.Marshal.Pure (pToJSVal, pFromJSVal)
+import GHCJS.DOM.Enums (PToJSVal(..), PFromJSVal(..))
 import GHCJS.Types
 import GHCJS.Marshal
 import GHCJS.DOM.AnalyserNode
@@ -28,8 +33,10 @@ import GHCJS.DOM.OscillatorNode
 
 import Control.Monad
 import Control.Monad.IO.Class
+import Data.Default
 import GHCJS.DOM
 import GHCJS.DOM.Types hiding (Event(..))
+import qualified GHCJS.DOM.Types as D
 import GHCJS.Types
 import Reflex
 import Reflex.Dom hiding (setValue)
@@ -78,19 +85,29 @@ data AnalyserNodeConfig t = AnalyserNodeConfig {
  , _analyserNodeConfig_change_smoothingTimeConstant  :: Event t Double
  }
 
-data Analyser t = Analyser {
+instance Reflex t => Default (AnalyserNodeConfig t) where
+  def = AnalyserNodeConfig {
+      _analyserNodeConfig_initial_fftSize               = 1024
+    , _analyserNodeConfig_change_fftSize                = never
+    , _analyserNodeConfig_initial_minDecibels           = -100
+    , _analyserNodeConfig_change_minDecibels            = never
+    , _analyserNodeConfig_initial_maxDecibels           = -30
+    , _analyserNodeConfig_change_maxDecibels            = never
+    , _analyserNodeConfig_initial_smoothingTimeConstant = 0.8
+    , _analyserNodeConfig_change_smoothingTimeConstant  = never
+    }
 
-    _analyser_node             :: AnalyserNode
-  , _analyser_getFrequencyData :: MonadWidget t m
-                               => Event t ()
-                               -> Event t [Double]
+data Analyser t m = Analyser {
 
-  }
+    _analyser_node                  :: AnalyserNode
+  , _analyser_getFloatFrequencyData :: Event t () -> m (Event t D.Float32Array)
+  , _analyser_getByteFrequencyData  :: Event t () -> m (Event t D.Uint8Array)
+}
 
 analyserNode :: MonadWidget t m
              => AudioContext
              -> AnalyserNodeConfig t
-             -> m AnalyserNode
+             -> m (Analyser t m)
 analyserNode ctx
   (AnalyserNodeConfig nFFT dnFFT minDB dminDB maxDB dmaxDB tau dtau) = do
     Just a <- liftIO $ createAnalyser ctx
@@ -107,11 +124,40 @@ analyserNode ctx
     setSmoothingTimeConstant a tau
     performEvent (ffor dtau $ \t -> liftIO (setSmoothingTimeConstant a t))
 
-    return $ Analyser a (getFreq a)
+    return $ Analyser a (getFreqFloat a) (getFreqByte a)
 
-getFreq :: MonadWidget t m
-        => AnalyserNode
-        -> Event t () -> m (Event t [Double])
-getFreq a e = ffor e $ \_ -> liftIO $ do
-  nSamp <- getFrequencyBinCount
+getFreqFloat :: MonadWidget t m
+             => AnalyserNode
+             -> Event t () -> m (Event t D.Float32Array)
+getFreqFloat a e = performEvent $ ffor e $ \_ -> liftIO $ do
+  nSamp :: Int <- fromIntegral <$> getFrequencyBinCount a
+  buffer <- js_createFloat32Array' nSamp
+  getFloatFrequencyData a (Just buffer)
+  return buffer
 
+getFreqByte :: MonadWidget t m
+             => AnalyserNode
+             -> Event t () -> m (Event t Uint8Array)
+getFreqByte a e = performEvent $ ffor e $ \_ -> liftIO $ do
+  nSamp  <- fromIntegral <$> getFrequencyBinCount a
+  buffer <- js_createUint8Array' nSamp
+  getByteFrequencyData a (Just buffer)
+  return buffer
+
+foreign import javascript unsafe "new Float32Array($1)"
+  js_createFloat32Array' :: Int -> IO Float32Array
+
+foreign import javascript unsafe "new Uint8Array($1)"
+  js_createUint8Array' :: Int -> IO Uint8Array
+
+foreign import javascript unsafe "new Uint8ClampedArray($1)"
+  js_createUint8ClampedArray' :: Int -> IO Uint8ClampedArray
+
+foreign import javascript unsafe "($1).length"
+  js_lengthUint8ClampedArray' :: Uint8ClampedArray -> IO Int
+
+--clampUint8Array :: Uint8Array -> Uint8ClampedArray
+--clampUint8Array = pFromJSVal . pToJSVal
+
+foreign import javascript unsafe "new Uint8ClampedArray($1)"
+  js_clampUint8Array :: Uint8Array -> IO Uint8ClampedArray
