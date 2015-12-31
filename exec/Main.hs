@@ -34,6 +34,7 @@ import Reflex
 import Text.Read (readMaybe)
 import Reflex.Dom hiding (setValue, restore)
 import Reflex.Dom.Time
+import Cochlea
 import WebAudio
 import Data.Map
 
@@ -45,28 +46,44 @@ main' :: MonadWidget t m => m ()
 main' = do
   pb <- getPostBuild
   --freqTxt <- value <$> textInput def
+  text "Osc Freq"
   fInput <- textInput $ def & textInputConfig_inputType .~ "range"
                             & attributes .~ constDyn (   "min"  =: "500"
                                                       <> "max"  =: "2000"
                                                       <> "step" =: "0.01")
-
+  el "br" $ return ()
   gInput <- textInput $ def & textInputConfig_inputType .~ "range"
                             & attributes .~ constDyn (   "min"  =: "0"
                                                       <> "max"  =: "1"
                                                       <> "step" =: "0.01"
                                                       <> "value" =: "0.01")
+  el "br" $ return ()
   let freqs = fmap ((\(x :: Int) -> (x, show x)) . floor . ((2 :: Double) ^^)) [(5 :: Int) ..11] :: [(Int,String)]
   fftLen <- dropdown 2048 (constDyn (Data.Map.fromList freqs)) def
+  el "br" $ return ()
+  text "Cochlear filter center freq"
+  cInput <- textInput $ def & textInputConfig_inputType .~ "range"
+                            & attributes .~ constDyn (   "min"  =: "100"
+                                                      <> "max"  =: "3000"
+                                                      <> "step" =: "0.01"
+                                                      <> "value" =: "500")
+
   c <- liftIO newAudioContext
   let freq = fmapMaybe readMaybe (updated (value fInput))
+
   osc <- oscillatorNode c (OscillatorNodeConfig 440 freq)
   g   <- gain c (GainConfig 0.01 (fmapMaybe readMaybe (updated (value gInput))))
   analyser <- analyserNode c def { _analyserNodeConfig_initial_smoothingTimeConstant = 0
                                  , _analyserNodeConfig_change_fftSize = updated (value fftLen)}
+
+  gFreq <- holdDyn 500 (fmapMaybe readMaybe (updated (value cInput)))
+  gFilt <- forDyn gFreq $ \f -> FGammaTone (GammaToneFilter 2 f 20 1)
+  cFilt <- cochlearFilter c (castToAudioNode g) (CochlearFilterConfig gFilt (value fftLen))
   liftIO $ do
     connect osc (Just g) 0 0
     Just dest <- getDestination c
-    connect g (Just dest) 0 0
+    --connect g (Just dest) 0 0
+    connect (castToAudioNode $ _cfConvolverNode cFilt) (Just dest) 0 0
     connect g (Just (_analyser_node analyser)) 0 0
     start osc 0
   text "Hello"
@@ -96,6 +113,9 @@ main' = do
                     imgData <- newImageData (Just img) 1 (fromIntegral $ l `div` 4)
                     shiftAppendColumn ctx'
                     putImageData ctx' (Just imgData) 290 0)
+
+  powers <- (_cfGetPower cFilt) (() <$ ticks)
+  -- performEvent (ffor powers $ \p -> liftIO $ print p)
 
   el "br" $ return ()
   text "end"
