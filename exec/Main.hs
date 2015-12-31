@@ -53,13 +53,14 @@ main' = do
   gInput <- textInput $ def & textInputConfig_inputType .~ "range"
                             & attributes .~ constDyn (   "min"  =: "0"
                                                       <> "max"  =: "1"
-                                                      <> "step" =: "0.01")
+                                                      <> "step" =: "0.01"
+                                                      <> "value" =: "0.01")
   let freqs = fmap ((\(x :: Int) -> (x, show x)) . floor . ((2 :: Double) ^^)) [(5 :: Int) ..11] :: [(Int,String)]
   fftLen <- dropdown 2048 (constDyn (Data.Map.fromList freqs)) def
   c <- liftIO newAudioContext
   let freq = fmapMaybe readMaybe (updated (value fInput))
   osc <- oscillatorNode c (OscillatorNodeConfig 440 freq)
-  g   <- gain c (GainConfig 0.1 (fmapMaybe readMaybe (updated (value gInput))))
+  g   <- gain c (GainConfig 0.01 (fmapMaybe readMaybe (updated (value gInput))))
   analyser <- analyserNode c def { _analyserNodeConfig_initial_smoothingTimeConstant = 0
                                  , _analyserNodeConfig_change_fftSize = updated (value fftLen)}
   liftIO $ do
@@ -134,7 +135,7 @@ squeezeAppendColumn ctx canv = do
 --   forM [0..n-1] $ \i -> do
 
 foreign import javascript unsafe
- "$r = new Uint8ClampedArray(($1).length * 4); for (var i = 0; i < ($1).length; i++) { var i0 = i*4; ($r)[i0] = ($1)[i]; ($r)[i0+1] = ($r)[i0]; ($r)[i0+2] = ($r)[i0]; ($r)[i0+3] = 255;}"
+ "$r = new Uint8ClampedArray(($1).length * 4); for (var i = 0; i < ($1).length; i++) { var i0 = i*4; ($r)[i0] = ($1)[i]; ($r)[i0+1] = 255 - ($r)[i0]; ($r)[i0+2] = ($r)[i0]; ($r)[i0+3] = 255;}"
   js_toGrayscale :: Uint8ClampedArray -> IO Uint8ClampedArray
 
 foreign import javascript unsafe "console.log(($1).data[0])"

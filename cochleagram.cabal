@@ -23,6 +23,7 @@ library
   -- other-extensions:    
   build-depends:       base >=4.8 && <4.9,
                        arb-fft,
+                       containers,
                        data-default,
                        text,
                        ghcjs-base >= 0.2 && < 0.3,
