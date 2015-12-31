@@ -77,7 +77,7 @@ setImpulseResponse ctx (CochlearFilter _ conv anyl _) filt nSamps = do
 
 
 foreign import javascript unsafe
-  "$r = ($1).createBuffer(2,22050,44100); var c = new Float32Array($2); ($r).copyToChannel(c,0,0); console.log(c)"
+  "$r = ($1).createBuffer(2,22050,44100); var c = new Float32Array($2); ($r).copyToChannel(c,0,0)"
   js_doublesToBuffer :: AudioContext -> JA.JSArray -> IO AudioBuffer
 
 foreign import javascript unsafe

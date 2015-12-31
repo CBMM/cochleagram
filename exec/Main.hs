@@ -115,7 +115,7 @@ main' = do
                     putImageData ctx' (Just imgData) 290 0)
 
   powers <- (_cfGetPower cFilt) (() <$ ticks)
-  -- performEvent (ffor powers $ \p -> liftIO $ print p)
+  performEvent (ffor powers $ \p -> liftIO $ print p)
 
   el "br" $ return ()
   text "end"
