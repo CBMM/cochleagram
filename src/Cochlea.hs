@@ -1,5 +1,7 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE JavaScriptFFI #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Cochlea where
@@ -45,8 +47,6 @@ data CochlearFilter t m = CochlearFilter {
   , _cfConvolverNode   :: ConvolverNode
   , _cfAnalyserNode    :: AnalyserNode
   , _cfGetPower        :: Event t () -> m (Event t Double)
-  -- , _cfFreqResponse    :: Dynamic t (Map Double Double)
-  -- , _cfImpulseResponse :: Dynamic t (Map Double Double)
   }
 
 impulseResponse :: Double -> Double -> Filter -> [Double]
@@ -81,7 +81,7 @@ foreign import javascript unsafe
   js_doublesToBuffer :: AudioContext -> JA.JSArray -> IO AudioBuffer
 
 foreign import javascript unsafe
-  "var buf = new Float32Array(($1).fftSize); ($1).getFloatTimeDomainData(buf); var $r = 0; buf.forEach(function(s){ $r = $r + s*s;}); $r = Math.sqrt($r)/buf.length"
+  "var buf = new Float32Array(($1).fftSize); ($1).getFloatTimeDomainData(buf); $r = 0; buf.forEach(function(s){ $r = $r + s*s;}); $r = Math.sqrt($r)/buf.length"
   js_getPower :: AnalyserNode -> IO Double
 
 cochlearFilter :: MonadWidget t m
@@ -94,10 +94,56 @@ cochlearFilter ctx inputNode (CochlearFilterConfig filt nSamp) = mdo
   Just anylNode <- liftIO $ createAnalyser  ctx
   connect inputNode (Just convNode) 0 0
   connect convNode  (Just anylNode) 0 0
-  let getPower e = (ffor e $ \_ -> liftIO $ js_getPower anylNode)
+  let getPower = do
+        p <- js_getPower anylNode
+        print $ "Power: " ++ show p
+        return p
   pb         <- getPostBuild
   filtParams <- combineDyn (,) filt nSamp
-  let cFilter = CochlearFilter ctx convNode anylNode (\req -> performEvent $ ffor req $ \_ -> liftIO (js_getPower anylNode))
+  let cFilter = CochlearFilter ctx convNode anylNode (\reqs -> performEvent $ ffor reqs $ \() -> liftIO getPower)
   _ <- performEvent (ffor (leftmost [tagDyn filtParams pb , updated filtParams]) $ \(f,n) -> liftIO $ setImpulseResponse ctx cFilter f n)
   return cFilter
+
+data CochleaConfig t = CochleaConfig
+  { _cochleaConfig_initial_freqRange :: (Double,Double)
+  , _cochleaConfig_change_freqRange  :: Event t (Double,Double)
+  , _cochleaConfig_initial_nFreq     :: Int
+  , _cochleaConfig_change_nFreq      :: Event t Int
+  , _cochleaConfig_initial_logSpace  :: Bool
+  , _cochleaConfig_change_logSpace   :: Event t Bool
+  }
+
+data Cochlea t m = Cochlea
+  { _cochlea_getPowerData :: Event t () -> m (Event t (Map Double Double))
+  , _cochlea_filters      :: Dynamic t (Map Double (CochlearFilter t m))
+  }
+
+freqSpace :: (Double, Double) -> Int -> Bool -> Map Double Filter
+freqSpace (freq1,freqN) n True =
+  fromList $ zipWith (\f b -> (f, FGammaTone (GammaToneFilter 2 f b 1))) freqs bws
+  where lf1   = log freq1
+        lfN   = log freqN
+        dFr   = (lfN - lf1) / (fromIntegral n - 1)
+        freqs = Prelude.map ((+ lf1) . (* dFr) . fromIntegral) [0..n-1] :: [Double]
+        bws   = Prelude.map (\f -> f/2) freqs :: [Double] -- TODO: This must be wrong
+
+cochlea :: MonadWidget t m => AudioContext -> AudioNode -> CochleaConfig t -> m (Cochlea t m)
+cochlea ctx inputNode (CochleaConfig rng drng n dn l dl) = do
+
+  frange    <- holdDyn rng drng
+  nfilts    <- holdDyn n   dn
+  logspace  <- holdDyn l   dl
+  filtspecs <- $(qDyn [| freqSpace $(unqDyn [|frange|])
+                                   $(unqDyn [|nfilts|])
+                                   $(unqDyn [|logspace|])
+                      |])
+  filts     <- listWithKey filtspecs $ \freq filt -> do
+    cochlearFilter ctx inputNode
+      CochlearFilterConfig { _cfcFilter = filt
+                           , _cfcNSamples = constDyn 2048 }
+
+  let getPowers reqs = performEvent $ ffor (tag (current filts) reqs) $ \cFilts ->
+        traverse (\cf -> liftIO (js_getPower $ _cfAnalyserNode cf)) cFilts
+
+  return (Cochlea getPowers filts)
 

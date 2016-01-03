@@ -82,8 +82,8 @@ main' = do
   liftIO $ do
     connect osc (Just g) 0 0
     Just dest <- getDestination c
-    --connect g (Just dest) 0 0
-    connect (castToAudioNode $ _cfConvolverNode cFilt) (Just dest) 0 0
+    connect g (Just dest) 0 0
+    --connect (castToAudioNode $ _cfConvolverNode cFilt) (Just dest) 0 0
     connect g (Just (_analyser_node analyser)) 0 0
     start osc 0
   text "Hello"
