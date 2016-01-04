@@ -68,6 +68,7 @@ gammaTone (GammaToneFilter n f b a) t =
 
 setImpulseResponse :: AudioContext -> CochlearFilter t m -> Filter -> Int -> IO ()
 setImpulseResponse ctx (CochlearFilter _ conv anyl _) filt nSamps = do
+  print filt -- TODO: drop
   let freq = 44100 -- TODO: Magic number. Can get this from AudioContext maybe?
       len = fromIntegral nSamps / freq
   let samps = impulseResponse freq len filt
@@ -96,11 +97,12 @@ cochlearFilter ctx inputNode (CochlearFilterConfig filt nSamp) = mdo
   connect convNode  (Just anylNode) 0 0
   let getPower = do
         p <- js_getPower anylNode
-        print $ "Power: " ++ show p
+        -- print $ "Power: " ++ show p
         return p
   pb         <- getPostBuild
   filtParams <- combineDyn (,) filt nSamp
   let cFilter = CochlearFilter ctx convNode anylNode (\reqs -> performEvent $ ffor reqs $ \() -> liftIO getPower)
+  _ <- performEvent $ ffor (updated nSamp) (\n -> liftIO (setFftSize (_cfAnalyserNode cFilter) (fromIntegral n)))
   _ <- performEvent (ffor (leftmost [tagDyn filtParams pb , updated filtParams]) $ \(f,n) -> liftIO $ setImpulseResponse ctx cFilter f n)
   return cFilter
 
@@ -124,8 +126,12 @@ freqSpace (freq1,freqN) n True =
   where lf1   = log freq1
         lfN   = log freqN
         dFr   = (lfN - lf1) / (fromIntegral n - 1)
-        freqs = Prelude.map ((+ lf1) . (* dFr) . fromIntegral) [0..n-1] :: [Double]
-        bws   = Prelude.map (\f -> f/2) freqs :: [Double] -- TODO: This must be wrong
+        freqs = Prelude.map (exp . (+ lf1) . (* dFr) . fromIntegral) [0..n-1] :: [Double]
+        -- inds  = [1..n]
+        inds  = Prelude.map (\f -> log f / dFr) freqs
+        -- bws   = 200 <$ freqs
+        -- bws   = zipWith (\i _ -> exp (i * dFr)) inds freqs
+        bws   = Prelude.map (\f -> f * dFr) freqs
 
 cochlea :: MonadWidget t m => AudioContext -> AudioNode -> CochleaConfig t -> m (Cochlea t m)
 cochlea ctx inputNode (CochleaConfig rng drng n dn l dl) = do

@@ -5,6 +5,7 @@
 
 module Main where
 
+import Control.Monad (when)
 import Data.Time (getCurrentTime)
 import Data.Monoid
 import GHCJS.Foreign
@@ -28,6 +29,7 @@ import GHCJS.DOM.ImageData
 import GHCJS.DOM.Types
 import GHCJS.DOM.Enums
 import qualified JavaScript.Web.Canvas as C
+import qualified JavaScript.Array as JA
 
 import Control.Monad.IO.Class
 import Reflex
@@ -79,6 +81,9 @@ main' = do
   gFreq <- holdDyn 500 (fmapMaybe readMaybe (updated (value cInput)))
   gFilt <- forDyn gFreq $ \f -> FGammaTone (GammaToneFilter 2 f 20 1)
   cFilt <- cochlearFilter c (castToAudioNode g) (CochlearFilterConfig gFilt (value fftLen))
+
+  fullCochlea <- cochlea c (castToAudioNode g) (CochleaConfig (100,3000) never 15 never True never)
+
   liftIO $ do
     connect osc (Just g) 0 0
     Just dest <- getDestination c
@@ -106,19 +111,40 @@ main' = do
   t0 <- liftIO Data.Time.getCurrentTime
   ticks <- tickLossy 0.015 t0
   spectra <- _analyser_getByteFrequencyData analyser (() <$ ticks)
-  performEvent (ffor spectra $ \a -> liftIO $ do
-                    a' <- js_clampUint8Array a
-                    img <- js_toGrayscale a'
-                    l <- js_lengthUint8ClampedArray' img
-                    imgData <- newImageData (Just img) 1 (fromIntegral $ l `div` 4)
-                    shiftAppendColumn ctx'
-                    putImageData ctx' (Just imgData) 290 0)
+  cochleaPowers <- _cochlea_getPowerData fullCochlea (() <$ ticks)
+
+  -- performEvent (ffor spectra $ \a -> liftIO $ do
+  --                   a' <- js_clampUint8Array a
+  --                   img <- js_toGrayscale a'
+  --                   l <- js_lengthUint8ClampedArray' img
+  --                   imgData <- newImageData (Just img) 1 (fromIntegral $ l `div` 4)
+  --                   shiftAppendColumn ctx'
+  --                   putImageData ctx' (Just imgData) 290 0)
 
   powers <- (_cfGetPower cFilt) (() <$ ticks)
-  performEvent (ffor powers $ \p -> liftIO $ print p)
+  -- performEvent (ffor powers $ \p -> liftIO $ print p)
+  performEvent (ffor cochleaPowers $ \ps -> liftIO $ do
+                    vs <- traverse toJSVal $ Prelude.map (dblToInt (-90) (-30) . toDb) $ elems ps
+                    when (length vs > 0) $ do
+                      a' <- js_makeUint8ClampedArray (JA.fromList vs)
+                      -- a' <- js_clampUint8Array a
+                      img <- js_toGrayscale a'
+                      l <- js_lengthUint8ClampedArray' img
+                      imgData <- newImageData (Just img) 1 (fromIntegral $ l `div` 4)
+                      shiftAppendColumn ctx'
+                      putImageData ctx' (Just imgData) 290 0)
+  -- performEvent (ffor cochleaPowers $ \ps -> liftIO $ print (maximum (ps <> 0 =: 0)))
 
   el "br" $ return ()
   text "end"
+
+-- map double to 0-255 range
+dblToInt :: Double -> Double -> Double -> Int
+dblToInt lo hi x = let x' = min hi (max lo x)
+                   in  floor $ 255 * ((x' - lo) / (hi - lo))
+
+toDb :: Double -> Double
+toDb x = 20 * logBase 10 x
 
 draw :: CanvasRenderingContext2D -> IO ()
 draw ctx = do
@@ -153,6 +179,9 @@ squeezeAppendColumn ctx canv = do
 --   n <- js_lengthUint8ClampedArray x
 --   r <- js_createUint8ClampedArray (n*4)
 --   forM [0..n-1] $ \i -> do
+
+foreign import javascript unsafe "new Uint8ClampedArray($1)"
+  js_makeUint8ClampedArray :: JA.JSArray -> IO Uint8ClampedArray
 
 foreign import javascript unsafe
  "$r = new Uint8ClampedArray(($1).length * 4); for (var i = 0; i < ($1).length; i++) { var i0 = i*4; ($r)[i0] = ($1)[i]; ($r)[i0+1] = 255 - ($r)[i0]; ($r)[i0+2] = ($r)[i0]; ($r)[i0+3] = 255;}"

@@ -156,8 +156,5 @@ foreign import javascript unsafe "new Uint8ClampedArray($1)"
 foreign import javascript unsafe "($1).length"
   js_lengthUint8ClampedArray' :: Uint8ClampedArray -> IO Int
 
---clampUint8Array :: Uint8Array -> Uint8ClampedArray
---clampUint8Array = pFromJSVal . pToJSVal
-
 foreign import javascript unsafe "new Uint8ClampedArray($1)"
   js_clampUint8Array :: Uint8Array -> IO Uint8ClampedArray
