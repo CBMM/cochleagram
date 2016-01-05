@@ -4,3 +4,4 @@
 [submodule "dist/build/cochleagram/cochleagram.jsexe"]
 	path = dist/build/cochleagram/cochleagram.jsexe
 	url = git@github.com:imalsogreg/cochleagram.git
+	ignore = all

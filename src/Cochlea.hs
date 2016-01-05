@@ -140,7 +140,8 @@ freqSpace (freq1,freqN) n True =
         inds  = Prelude.map (\f -> log f / dFr) freqs
         -- bws   = 200 <$ freqs
         -- bws   = zipWith (\i _ -> exp (i * dFr)) inds freqs
-        bws   = Prelude.map (\f -> f * dFr) freqs
+        bws   = Prelude.map (\f -> f * dFr / 2) freqs
+        -- bws   = (\f -> 24.7 * (4.37 * f / 1000 + 1)) <$> freqs
 
 cochlea :: MonadWidget t m => AudioContext -> AudioNode -> CochleaConfig t -> m (Cochlea t m)
 cochlea ctx inputNode (CochleaConfig rng drng n dn l dl) = do
@@ -155,7 +156,7 @@ cochlea ctx inputNode (CochleaConfig rng drng n dn l dl) = do
   filts     <- listWithKey filtspecs $ \freq filt -> do
     cochlearFilter ctx inputNode
       CochlearFilterConfig { _cfcFilter = filt
-                           , _cfcNSamples = constDyn 512 }
+                           , _cfcNSamples = constDyn 1024 }
 
   let getPowers reqs = performEvent $ ffor (tag (current filts) reqs) $ \cFilts ->
         traverse (\cf -> liftIO (js_getPower $ _cfAnalyserNode cf)) cFilts

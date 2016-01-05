@@ -106,7 +106,7 @@ main' = do
         liftIO $ print'' err
       Nothing -> liftIO (putStrLn "FAILURE NOTHING")
 
-  liftIO $ putStrLn "Did getUserMedia5"
+  liftIO $ putStrLn "Did getUserMedia7"
   -- stream2 <- liftIO $ getUserMedia nav (Just (Dictionary (jsval myDict)))
   -- Just src2 <- liftIO $ createMediaStreamSource c (Just stream2)
   -- liftIO $ connect (castToAudioNode src2) (Just g) 0 0
@@ -118,7 +118,7 @@ main' = do
   -- gFilt <- forDyn gFreq $ \f -> FGammaTone (GammaToneFilter 2 f 20 1)
   -- cFilt <- cochlearFilter c (castToAudioNode g) (CochlearFilterConfig gFilt (value fftLen))
 
-  fullCochlea <- cochlea c (castToAudioNode g) (CochleaConfig (100,3000) never 40 never True never)
+  fullCochlea <- cochlea c (castToAudioNode g) (CochleaConfig (300,3000) never 60 never True never)
 
   liftIO $ do
     --connect mic (Just g) 0 0
@@ -136,7 +136,11 @@ main' = do
     putStrLn "Test2"
   text "Hello"
   canvEl <- fmap (castToHTMLCanvasElement . _el_element . fst) $
-            elAttr' "canvas" ("id" =: "canvas" <> "width" =: "300" <> "height" =: "60" <> "image-rendering" =: "pixelated") $ return ()
+            elAttr' "canvas" ("id" =: "canvas"
+                           <> "width" =: "100"
+                           <> "height" =: "60"
+                           <> "image-rendering" =: "pixelated"
+                           <> "style" =: "height:200px") $ return ()
   ctx'' <- liftIO $ GHCJS.DOM.HTMLCanvasElement.getContext
            canvEl ("2d" :: JSString)
   Just ctx' :: Maybe CanvasRenderingContext2D <- liftIO $ fromJSVal ctx''
@@ -161,7 +165,7 @@ main' = do
                       l <- js_lengthUint8ClampedArray' img
                       imgData <- newImageData (Just img) 1 (fromIntegral $ l `div` 4)
                       shiftAppendColumn ctx'
-                      putImageData ctx' (Just imgData) 290 0)
+                      putImageData ctx' (Just imgData) 99 0)
 
   el "br" $ return ()
 
@@ -201,13 +205,13 @@ draw ctx = do
 
 shiftAppendColumn :: CanvasRenderingContext2D -> IO ()
 shiftAppendColumn ctx = do
-  Just d <- getImageData ctx 1 0 300 150
+  Just d <- getImageData ctx 1 0 100 60
   putImageData ctx (Just d) 0 0
 
 squeezeAppendColumn :: CanvasRenderingContext2D -> HTMLCanvasElement -> IO ()
 squeezeAppendColumn ctx canv = do
   save ctx
-  scale ctx (299/300) 1
+  scale ctx (99/100) 1
   drawImageFromCanvas ctx (Just canv) 0 0
   restore ctx
 
