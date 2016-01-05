@@ -12,7 +12,7 @@ ghcjs_B7KLFJ07Vte3zPHAgRIBTb:10933
 ghcjs_D7BYGeMTlMGF2My8KZzKUS:202018
 ghcjs_Kc7TQ2cEDg1F5e5cgY2Vuk:14738
 integer-gmp:             42875
-main:                    211589
+main:                    212352
 refle_7EFZfl0m4Fe8Nfy5veIevU:482050
 refle_HxIfaa8jgl1Efs0BJoROZl:489665
 reftf_JOU40Nd0lxyACBtr3v80Qj:1202
@@ -155,7 +155,7 @@ integer-gmp
     GHC.Integer.Type:                   42542
 
 main
-    Main:                               211589
+    Main:                               212352
 
 refle_7EFZfl0m4Fe8Nfy5veIevU
     Data.Functor.Misc:                  8785
@@ -200,5 +200,5 @@ trans_KzbnBSIEqPI2eU1Inn4mzm
 
 
 
-packed metadata: 453940
+packed metadata: 454280
 
