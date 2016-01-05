@@ -1,6 +1,6 @@
 code size summary per package:
 
-base:                    577766
+base:                    518361
 cochl_4QTSBJNqORKKHm9l4coofu:89833
 conta_5w3UY4chXx62LVUOUrXeRm:164027
 deeps_IA8DgGbqfWcHYE0vChdRyn:615
@@ -11,8 +11,8 @@ ghc-prim:                24391
 ghcjs_B7KLFJ07Vte3zPHAgRIBTb:10933
 ghcjs_D7BYGeMTlMGF2My8KZzKUS:189447
 ghcjs_Kc7TQ2cEDg1F5e5cgY2Vuk:14738
-integer-gmp:             43199
-main:                    200788
+integer-gmp:             42875
+main:                    200730
 refle_7EFZfl0m4Fe8Nfy5veIevU:482050
 refle_HxIfaa8jgl1Efs0BJoROZl:489665
 reftf_JOU40Nd0lxyACBtr3v80Qj:1202
@@ -27,7 +27,7 @@ code size per module:
 
 base
     Control.Concurrent.Chan:            3533
-    Control.Exception.Base:             7309
+    Control.Exception.Base:             6789
     Control.Monad.Fix:                  584
     Data.Either:                        397
     Data.Fixed:                         3009
@@ -40,14 +40,13 @@ base
     Foreign.Marshal.Alloc:              375
     Foreign.Marshal.Array:              2038
     Foreign.Storable:                   2680
-    GHC.Arr:                            3667
     GHC.Base:                           9241
     GHC.Char:                           718
     GHC.Conc.Sync:                      7822
     GHC.Enum:                           19566
     GHC.Err:                            382
     GHC.Exception:                      9546
-    GHC.Float:                          72513
+    GHC.Float:                          16206
     GHC.Foreign:                        12136
     GHC.ForeignPtr:                     1501
     GHC.IO:                             4536
@@ -68,15 +67,15 @@ base
     GHC.IO.Handle.Types:                3834
     GHC.IORef:                          166
     GHC.Int:                            802
-    GHC.List:                           12625
+    GHC.List:                           11447
     GHC.MVar:                           188
     GHC.Num:                            2985
     GHC.Ptr:                            188
     GHC.Read:                           21080
-    GHC.Real:                           28885
+    GHC.Real:                           26665
     GHC.ST:                             186
     GHC.STRef:                          648
-    GHC.Show:                           8625
+    GHC.Show:                           13112
     GHC.Storable:                       1084
     GHC.TopHandler:                     10349
     GHC.Weak:                           188
@@ -151,10 +150,10 @@ ghcjs_Kc7TQ2cEDg1F5e5cgY2Vuk
 
 integer-gmp
     GHC.Integer.GMP.Prim:               333
-    GHC.Integer.Type:                   42866
+    GHC.Integer.Type:                   42542
 
 main
-    Main:                               200788
+    Main:                               200730
 
 refle_7EFZfl0m4Fe8Nfy5veIevU
     Data.Functor.Misc:                  8785
@@ -199,5 +198,5 @@ trans_KzbnBSIEqPI2eU1Inn4mzm
 
 
 
-packed metadata: 452464
+packed metadata: 447621
 
