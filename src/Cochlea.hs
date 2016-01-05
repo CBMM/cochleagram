@@ -68,7 +68,6 @@ gammaTone (GammaToneFilter n f b a) t =
 
 setImpulseResponse :: AudioContext -> CochlearFilter t m -> Filter -> Int -> IO ()
 setImpulseResponse ctx (CochlearFilter _ conv anyl _) filt nSamps = do
-  print filt -- TODO: drop
   let freq = 44100 -- TODO: Magic number. Can get this from AudioContext maybe?
       len = fromIntegral nSamps / freq
   let samps = impulseResponse freq len filt
@@ -77,13 +76,23 @@ setImpulseResponse ctx (CochlearFilter _ conv anyl _) filt nSamps = do
   setBuffer conv (Just buf)
 
 
-foreign import javascript unsafe
-  "$r = ($1).createBuffer(2,22050,44100); var c = new Float32Array($2); ($r).copyToChannel(c,0,0)"
-  js_doublesToBuffer :: AudioContext -> JA.JSArray -> IO AudioBuffer
+-- foreign import javascript unsafe
+--   "$r = ($1).createBuffer(2,22050,44100); var c = new Float32Array($2); ($r).copyToChannel(c,0,0)"
+--   js_doublesToBuffer :: AudioContext -> JA.JSArray -> IO AudioBuffer
 
 foreign import javascript unsafe
-  "var buf = new Float32Array(($1).fftSize); ($1).getFloatTimeDomainData(buf); $r = 0; buf.forEach(function(s){ $r = $r + s*s;}); $r = Math.sqrt($r)/buf.length"
+  "$r = ($1).createBuffer(2,($2).length,44100); var d = ($r).getChannelData(0); for (var i = 0; i < ($2).length; i++) {d[i] = ($2)[i]; };"
+  js_doublesToBuffer :: AudioContext -> JA.JSArray -> IO AudioBuffer
+
+-- foreign import javascript unsafe
+--   "var buf = new Float32Array(($1).fftSize); ($1).getByteTimeDomainData(buf); $r = 0; buf.forEach(function(s){ $r = $r + s*s;}); $r = Math.sqrt($r)/buf.length"
+--   js_getPower :: AnalyserNode -> IO Double
+
+foreign import javascript unsafe
+  "var buf = new Uint8Array(($1).fftSize); ($1).getByteTimeDomainData(buf); $r = 0; for (var i = 0; i < ($1).fftSize; i++){ var s = (buf[i] - 127) * 0.003921; $r = $r + s*s;}; $r = Math.sqrt($r)/buf.length"
   js_getPower :: AnalyserNode -> IO Double
+
+
 
 cochlearFilter :: MonadWidget t m
                => AudioContext

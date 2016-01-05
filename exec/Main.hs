@@ -10,7 +10,9 @@ import Data.Time (getCurrentTime)
 import Data.Monoid
 import GHCJS.Foreign
 import GHCJS.Types
+import qualified GHCJS.Types as T
 import GHCJS.Marshal
+import GHCJS.DOM
 import GHCJS.DOM.AudioBuffer
 import GHCJS.DOM.AudioBufferCallback
 import GHCJS.DOM.AudioContext
@@ -26,10 +28,15 @@ import GHCJS.DOM.OscillatorNode
 import GHCJS.DOM.HTMLCanvasElement
 import GHCJS.DOM.CanvasRenderingContext2D
 import GHCJS.DOM.ImageData
+import GHCJS.DOM.NavigatorUserMediaSuccessCallback
+import GHCJS.DOM.NavigatorUserMediaErrorCallback
 import GHCJS.DOM.Types
 import GHCJS.DOM.Enums
+import GHCJS.DOM.Navigator
+import GHCJS.DOM.Window
 import qualified JavaScript.Web.Canvas as C
 import qualified JavaScript.Array as JA
+import qualified JavaScript.Object as JO
 
 import Control.Monad.IO.Class
 import Reflex
@@ -74,7 +81,35 @@ main' = do
   let freq = fmapMaybe readMaybe (updated (value fInput))
 
   osc <- oscillatorNode c (OscillatorNodeConfig 440 freq)
+
+  -- Just win <- liftIO currentWindow
+  -- Just nav <- liftIO $ getNavigator win
+  -- b <- liftIO $ toJSVal True
+  -- myDict <- liftIO $ JO.create >>= \o -> JO.setProp "audio" b o >> return o
+  -- liftIO $ print''' $ Dictionary (jsval myDict)
   g   <- gain c (GainConfig 0.01 (fmapMaybe readMaybe (updated (value gInput))))
+
+  -- mediaCallback <- liftIO $ newNavigatorUserMediaSuccessCallback $ \s -> do
+  --   case s of
+  --     Just stream -> do
+  --       Just src <- liftIO $ createMediaStreamSource c (Just stream)
+  --       liftIO $ Prelude.putStrLn "SUCCESS"
+  --       liftIO $ connect (castToAudioNode src) (Just g) 0 0
+  --     Nothing -> liftIO (putStrLn "SUCCESS NOTHING")
+
+  -- failureCallback <- liftIO $ newNavigatorUserMediaErrorCallback $ \e -> do
+  --   case e of
+  --     Just err -> do
+  --       liftIO $ putStrLn "FAILURE"
+  --       liftIO $ print'' err
+  --     Nothing -> liftIO (putStrLn "FAILURE NOTHING")
+
+  -- webkitGetUserMedia nav (Just $ Dictionary (jsval myDict)) (Just mediaCallback) (Just failureCallback)
+  -- liftIO $ putStrLn "Did getUserMedia"
+  -- stream2 <- liftIO $ getUserMedia nav (Just (Dictionary (jsval myDict)))
+  -- Just src2 <- liftIO $ createMediaStreamSource c (Just stream2)
+  -- liftIO $ connect (castToAudioNode src2) (Just g) 0 0
+
   analyser <- analyserNode c def { _analyserNodeConfig_initial_smoothingTimeConstant = 0
                                  , _analyserNodeConfig_change_fftSize = updated (value fftLen)}
 
@@ -82,18 +117,20 @@ main' = do
   gFilt <- forDyn gFreq $ \f -> FGammaTone (GammaToneFilter 2 f 20 1)
   cFilt <- cochlearFilter c (castToAudioNode g) (CochlearFilterConfig gFilt (value fftLen))
 
-  fullCochlea <- cochlea c (castToAudioNode g) (CochleaConfig (100,3000) never 15 never True never)
+  fullCochlea <- cochlea c (castToAudioNode g) (CochleaConfig (100,3000) never 60 never True never)
 
   liftIO $ do
+    --connect mic (Just g) 0 0
     connect osc (Just g) 0 0
     Just dest <- getDestination c
     connect g (Just dest) 0 0
     --connect (castToAudioNode $ _cfConvolverNode cFilt) (Just dest) 0 0
     connect g (Just (_analyser_node analyser)) 0 0
     start osc 0
+  liftIO $ js_connectMic c (castToAudioNode g)
   text "Hello"
   canvEl <- fmap (castToHTMLCanvasElement . _el_element . fst) $
-            elAttr' "canvas" ("id" =: "canvas") $ return ()
+            elAttr' "canvas" ("id" =: "canvas" <> "width" =: "300" <> "height" =: "60" <> "image-rendering" =: "pixelated") $ return ()
   ctx'' <- liftIO $ GHCJS.DOM.HTMLCanvasElement.getContext
            canvEl ("2d" :: JSString)
   Just ctx' :: Maybe CanvasRenderingContext2D <- liftIO $ fromJSVal ctx''
@@ -106,10 +143,11 @@ main' = do
 
   clicks  <- button "squeeze"
   clicks' <- button "shift"
-  performEvent (ffor clicks $ \() -> liftIO $ squeezeAppendColumn ctx' canvEl)
+  performEvent (ffor clicks $ \() -> liftIO $ squeezeAppendColumn ctx' canvEl >> js_connectMic c (castToAudioNode g))
   performEvent (ffor clicks' $ \_ -> liftIO $ shiftAppendColumn ctx')
   t0 <- liftIO Data.Time.getCurrentTime
-  ticks <- tickLossy 0.015 t0
+  -- ticks <- tickLossy 0.015 t0
+  ticks <- tickLossy 0.060 t0
   spectra <- _analyser_getByteFrequencyData analyser (() <$ ticks)
   cochleaPowers <- _cochlea_getPowerData fullCochlea (() <$ ticks)
 
@@ -150,15 +188,6 @@ draw :: CanvasRenderingContext2D -> IO ()
 draw ctx = do
   setFillStyle ctx (Just $ CanvasStyle $ jsval ("rgba(255,255,255,0.05)" :: JSString))
   fillRect ctx 0 0 300 150
-  setFillStyle ctx (Just $ CanvasStyle $ jsval ("blue" :: JSString))
-  fillRect ctx 104 105 30 30
-  beginPath ctx
-  putStrLn "Drawing"
-  arc ctx 110 110 20 0 3 True -- ctx
-  closePath ctx
-  let sty :: JSVal = jsval ("rgba(105,105,0,0.5)" :: JSString)
-  setFillStyle ctx (Just (CanvasStyle sty))
-  fill ctx CanvasWindingRuleNonzero
 
 shiftAppendColumn :: CanvasRenderingContext2D -> IO ()
 shiftAppendColumn ctx = do
@@ -174,12 +203,6 @@ squeezeAppendColumn ctx canv = do
   drawImageFromCanvas ctx (Just canv) 0 0
   restore ctx
 
--- toGrayscale :: Uint8ClampedArray -> IO Uint8ClampedArray
--- toGrayscale x = do
---   n <- js_lengthUint8ClampedArray x
---   r <- js_createUint8ClampedArray (n*4)
---   forM [0..n-1] $ \i -> do
-
 foreign import javascript unsafe "new Uint8ClampedArray($1)"
   js_makeUint8ClampedArray :: JA.JSArray -> IO Uint8ClampedArray
 
@@ -189,6 +212,12 @@ foreign import javascript unsafe
 
 foreign import javascript unsafe "console.log(($1).data[0])"
   print' :: ImageData -> IO ()
--- foreign import unsafe "new Uint8ClampedArray()"
--- js_toGrayscale :: Uint8ClampedArray -> Uint8ClampedArray
--- js_toGrayscale
+
+foreign import javascript unsafe "console.log($1)"
+ print'' :: NavigatorUserMediaError -> IO ()
+
+foreign import javascript unsafe "console.log($1)"
+ print''' :: Dictionary -> IO ()
+
+foreign import javascript unsafe "console.log('hi'); try {navigator.webkitGetUserMedia({'audio':true},function(s){mss = ($1).createMediaStreamSource(s); mss.connect($2); console.log('SUCCESS');}, function(e){ console.log('ERROR:' + e);})} catch (e) { alert(e) }"
+  js_connectMic :: AudioContext -> AudioNode -> IO ()
