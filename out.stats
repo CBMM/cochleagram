@@ -12,9 +12,9 @@ ghcjs_B7KLFJ07Vte3zPHAgRIBTb:10933
 ghcjs_D7BYGeMTlMGF2My8KZzKUS:189447
 ghcjs_Kc7TQ2cEDg1F5e5cgY2Vuk:14738
 integer-gmp:             42875
-main:                    202535
-refle_7EFZfl0m4Fe8Nfy5veIevU:482050
-refle_HxIfaa8jgl1Efs0BJoROZl:489665
+main:                    166083
+refle_7EFZfl0m4Fe8Nfy5veIevU:481154
+refle_HxIfaa8jgl1Efs0BJoROZl:487908
 reftf_JOU40Nd0lxyACBtr3v80Qj:1202
 safe_BjI3SxrMPD5F5AZ3gJB9mt:4752
 text_1ffW5NTi2SPHBcBuYSkgjk:3756
@@ -153,12 +153,12 @@ integer-gmp
     GHC.Integer.Type:                   42542
 
 main
-    Main:                               202535
+    Main:                               166083
 
 refle_7EFZfl0m4Fe8Nfy5veIevU
     Data.Functor.Misc:                  8785
     Reflex.Class:                       26279
-    Reflex.Dynamic:                     80962
+    Reflex.Dynamic:                     80066
     Reflex.Host.Class:                  1986
     Reflex.Spider.Internal:             364038
 
@@ -166,7 +166,7 @@ refle_HxIfaa8jgl1Efs0BJoROZl
     Reflex.Dom.Class:                   32925
     Reflex.Dom.Internal:                55471
     Reflex.Dom.Time:                    9526
-    Reflex.Dom.Widget.Basic:            353180
+    Reflex.Dom.Widget.Basic:            351423
     Reflex.Dom.Widget.Input:            38563
 
 reftf_JOU40Nd0lxyACBtr3v80Qj
@@ -198,5 +198,5 @@ trans_KzbnBSIEqPI2eU1Inn4mzm
 
 
 
-packed metadata: 443842
+packed metadata: 437429
 
