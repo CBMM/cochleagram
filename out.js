@@ -43316,7 +43316,7 @@ function h$$acl()
   var b = h$stack[(h$sp - 1)];
   h$sp -= 2;
   var c = a.d1;
-  c["putImageData"](b, 290.0, 0.0);
+  c["putImageData"](b, 99.0, 0.0);
   h$r1 = h$ghczmprimZCGHCziTupleziZLZR;
   return h$stack[h$sp];
 };
@@ -45491,7 +45491,7 @@ function h$$afE()
   var b = h$stack[(h$sp - 1)];
   h$sp -= 2;
   var c = a.d1;
-  c["putImageData"](b, 290.0, 0.0);
+  c["putImageData"](b, 99.0, 0.0);
   h$r1 = h$ghczmprimZCGHCziTupleziZLZR;
   return h$stack[h$sp];
 };
@@ -46702,7 +46702,7 @@ function h$mainZCMainzizdwa1_e()
   var a = h$r2;
   var b = h$r3;
   a["save"]();
-  a["scale"](0.996666669845581, 1.0);
+  a["scale"](0.9900000095367432, 1.0);
   a["drawImage"](b, 0.0, 0.0);
   a["restore"]();
   h$r1 = h$ghczmprimZCGHCziTupleziZLZR;
@@ -104770,8 +104770,8 @@ var h$mainZCMainzimain2 = h$d();
 var h$mainZCMainzishiftAppendColumn1 = h$d();
 var h$mainZCMainzishiftAppendColumn8 = h$p(1.0);
 var h$mainZCMainzishiftAppendColumn7 = h$p(0.0);
-var h$mainZCMainzishiftAppendColumn6 = h$p(300.0);
-var h$mainZCMainzishiftAppendColumn5 = h$p(150.0);
+var h$mainZCMainzishiftAppendColumn6 = h$p(100.0);
+var h$mainZCMainzishiftAppendColumn5 = h$p(60.0);
 var h$mainZCMainzishiftAppendColumn2 = h$d();
 h$di(h$mainZCMainzishiftAppendColumn4);
 var h$mainZCMainzishiftAppendColumn3 = h$d();
