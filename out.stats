@@ -1,7 +1,7 @@
 code size summary per package:
 
 base:                    510259
-cochl_4QTSBJNqORKKHm9l4coofu:89966
+cochl_4QTSBJNqORKKHm9l4coofu:90070
 conta_5w3UY4chXx62LVUOUrXeRm:164027
 deeps_IA8DgGbqfWcHYE0vChdRyn:615
 depen_3ZazWrAF611CC0pGA27xUj:2889
@@ -87,7 +87,7 @@ base
     Text.Read.Lex:                      82904
 
 cochl_4QTSBJNqORKKHm9l4coofu
-    Cochlea:                            60037
+    Cochlea:                            60141
     WebAudio:                           29929
 
 conta_5w3UY4chXx62LVUOUrXeRm
@@ -198,5 +198,5 @@ trans_KzbnBSIEqPI2eU1Inn4mzm
 
 
 
-packed metadata: 439506
+packed metadata: 439402
 
