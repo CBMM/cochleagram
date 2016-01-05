@@ -1,7 +1,7 @@
 code size summary per package:
 
-base:                    510604
-cochl_4QTSBJNqORKKHm9l4coofu:89833
+base:                    510259
+cochl_4QTSBJNqORKKHm9l4coofu:89966
 conta_5w3UY4chXx62LVUOUrXeRm:164027
 deeps_IA8DgGbqfWcHYE0vChdRyn:615
 depen_3ZazWrAF611CC0pGA27xUj:2889
@@ -12,7 +12,7 @@ ghcjs_B7KLFJ07Vte3zPHAgRIBTb:10933
 ghcjs_D7BYGeMTlMGF2My8KZzKUS:189447
 ghcjs_Kc7TQ2cEDg1F5e5cgY2Vuk:14738
 integer-gmp:             42875
-main:                    173308
+main:                    173305
 refle_7EFZfl0m4Fe8Nfy5veIevU:481154
 refle_HxIfaa8jgl1Efs0BJoROZl:487908
 reftf_JOU40Nd0lxyACBtr3v80Qj:1202
@@ -46,7 +46,7 @@ base
     GHC.Enum:                           19566
     GHC.Err:                            382
     GHC.Exception:                      9546
-    GHC.Float:                          16206
+    GHC.Float:                          15861
     GHC.Foreign:                        12136
     GHC.ForeignPtr:                     1501
     GHC.IO:                             4536
@@ -87,7 +87,7 @@ base
     Text.Read.Lex:                      82904
 
 cochl_4QTSBJNqORKKHm9l4coofu
-    Cochlea:                            59904
+    Cochlea:                            60037
     WebAudio:                           29929
 
 conta_5w3UY4chXx62LVUOUrXeRm
@@ -153,7 +153,7 @@ integer-gmp
     GHC.Integer.Type:                   42542
 
 main
-    Main:                               173308
+    Main:                               173305
 
 refle_7EFZfl0m4Fe8Nfy5veIevU
     Data.Functor.Misc:                  8785
@@ -198,5 +198,5 @@ trans_KzbnBSIEqPI2eU1Inn4mzm
 
 
 
-packed metadata: 439603
+packed metadata: 439506
 
