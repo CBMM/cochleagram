@@ -41524,7 +41524,7 @@ function h$$Zl()
   h$l4(true, h$$ajI, h$baseZCGHCziIOziHandleziFDzistdout, h$baseZCGHCziIOziHandleziTextzihPutStr2);
   return h$ap_4_3_fast();
 };
-var h$$ajI = h$strta("Did getUserMedia5");
+var h$$ajI = h$strta("Did getUserMedia6");
 function h$$Zm()
 {
   h$bh();
@@ -104821,7 +104821,7 @@ h$di(h$$aqV);
 h$di(h$$aqW);
 var h$$aqX = h$d();
 var h$$aqY = h$d();
-var h$$aqZ = h$p(512);
+var h$$aqZ = h$p(1024);
 var h$cochlzu4QTSBJNqORKKHm9l4coofuZCCochleaziCochlea = h$d();
 var h$cochlzu4QTSBJNqORKKHm9l4coofuZCCochleaziCochlearFilter = h$d();
 var h$cochlzu4QTSBJNqORKKHm9l4coofuZCCochleaziCochleaConfig = h$d();
