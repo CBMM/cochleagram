@@ -1,11 +1,13 @@
-{-# LANGUAGE JavaScriptFFI #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE JavaScriptFFI #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Main where
 
 import Control.Monad (when)
+import qualified Data.JSString as JS
 import Data.Time (getCurrentTime)
 import Data.Monoid
 import GHCJS.Foreign
@@ -51,7 +53,7 @@ import Data.Map
 main :: IO ()
 main = mainWidget main'
 
-main' :: MonadWidget t m => m ()
+main' :: forall t m. MonadWidget t m => m ()
 main' = do
   pb <- getPostBuild
   --freqTxt <- value <$> textInput def
@@ -104,8 +106,7 @@ main' = do
         liftIO $ print'' err
       Nothing -> liftIO (putStrLn "FAILURE NOTHING")
 
-  webkitGetUserMedia nav (Just $ Dictionary (jsval myDict)) (Just mediaCallback) (Just failureCallback)
-  -- liftIO $ putStrLn "Did getUserMedia"
+  liftIO $ putStrLn "Did getUserMedia5"
   -- stream2 <- liftIO $ getUserMedia nav (Just (Dictionary (jsval myDict)))
   -- Just src2 <- liftIO $ createMediaStreamSource c (Just stream2)
   -- liftIO $ connect (castToAudioNode src2) (Just g) 0 0
@@ -117,7 +118,7 @@ main' = do
   -- gFilt <- forDyn gFreq $ \f -> FGammaTone (GammaToneFilter 2 f 20 1)
   -- cFilt <- cochlearFilter c (castToAudioNode g) (CochlearFilterConfig gFilt (value fftLen))
 
-  fullCochlea <- cochlea c (castToAudioNode g) (CochleaConfig (100,3000) never 60 never True never)
+  fullCochlea <- cochlea c (castToAudioNode g) (CochleaConfig (100,3000) never 40 never True never)
 
   liftIO $ do
     --connect mic (Just g) 0 0
@@ -127,6 +128,12 @@ main' = do
     --connect (castToAudioNode $ _cfConvolverNode cFilt) (Just dest) 0 0
     connect g (Just (_analyser_node analyser)) 0 0
     -- start osc 0
+    nm <- js_userAgent
+    when ("Chrome" `JS.isInfixOf` nm)  $ putStrLn "Chrome" >>
+      webkitGetUserMedia nav (Just $ Dictionary (jsval myDict)) (Just mediaCallback) (Just failureCallback)
+    -- js_connectMic  c (castToAudioNode g)
+    when ("Firefox" `JS.isInfixOf` nm) $ putStrLn "FF" >> js_connectMic' c (castToAudioNode g)
+    putStrLn "Test2"
   text "Hello"
   canvEl <- fmap (castToHTMLCanvasElement . _el_element . fst) $
             elAttr' "canvas" ("id" =: "canvas" <> "width" =: "300" <> "height" =: "60" <> "image-rendering" =: "pixelated") $ return ()
@@ -140,16 +147,10 @@ main' = do
 
   el "br" $ return ()
 
-  -- clicks  <- button "squeeze"
-  -- clicks' <- button "shift"
-  -- performEvent (ffor clicks $ \() -> liftIO $ squeezeAppendColumn ctx' canvEl >> js_connectMic c (castToAudioNode g))
-  -- performEvent (ffor clicks' $ \_ -> liftIO $ shiftAppendColumn ctx')
+
   t0 <- liftIO Data.Time.getCurrentTime
-  -- ticks <- tickLossy 0.015 t0
-  ticks <- tickLossy 0.060 t0
-  -- spectra <- _analyser_getByteFrequencyData analyser (() <$ ticks)
+  ticks <- tickLossy 0.033 t0
   cochleaPowers <- _cochlea_getPowerData fullCochlea (() <$ ticks)
-  -- powers <- (_cfGetPower cFilt) (() <$ ticks)
 
   performEvent (ffor cochleaPowers $ \ps -> liftIO $ do
                     vs <- traverse toJSVal $ Prelude.map (dblToInt (-90) (-30) . toDb) $ elems ps
@@ -163,6 +164,27 @@ main' = do
                       putImageData ctx' (Just imgData) 290 0)
 
   el "br" $ return ()
+
+  -- ticks60 <- tickLossy 0.015 t0
+  -- lightLevels <- foldDyn
+  --                (\l0 l -> unionWith (\a b -> max (a*0.99) b) l0 l)
+  --                mempty
+  --                cochleaPowers
+  -- -- _ <- el "div" $ do
+  -- listViewWithKey' lightLevels $ \k v -> do
+  --     let boxColor l = "rgba("
+  --                   <> show (dblToInt (-90) (-30) (20 * logBase 10 l))
+  --                   <> ",0,0,1)"
+  --     boxAttrs <- forDyn v $ \light ->
+  --       "style" =: ("float:left;height:20px;width:20px;background-color:" <> boxColor light)
+  --                                   -- <> "hight" =: "20px"
+  --                                   -- <> "width" =: "20px"
+  --                                   -- <> "style" =: boxColor light
+  --     -- boxLabel <- mapDyn (show . boxColor) v
+  --     (thisBox :: El t, _) <- elDynAttr' "div" boxAttrs $
+  --       return () -- (dynText boxLabel)
+  --     return (domEvent Click thisBox :: Reflex.Dom.Event t ())
+  -- return ()
 
 -- map double to 0-255 range
 dblToInt :: Double -> Double -> Double -> Int
@@ -205,5 +227,11 @@ foreign import javascript unsafe "console.log($1)"
 foreign import javascript unsafe "console.log($1)"
  print''' :: Dictionary -> IO ()
 
-foreign import javascript unsafe "console.log('hi'); try {navigator.webkitGetUserMedia({'audio':true},function(s){mss = ($1).createMediaStreamSource(s); mss.connect($2); console.log('SUCCESS');}, function(e){ console.log('ERROR:' + e);})} catch (e) { alert(e) }"
+foreign import javascript unsafe "try {navigator.webkitGetUserMedia({'audio':true},function(s){mss = ($1).createMediaStreamSource(s); mss.connect($2); console.log('SUCCESS');}, function(e){ console.log('ERROR:' + e);})} catch (e) { alert(e) }"
   js_connectMic :: AudioContext -> AudioNode -> IO ()
+
+foreign import javascript unsafe "navigator.userAgent"
+  js_userAgent :: IO JSString
+
+foreign import javascript unsafe "navigator.mediaDevices.getUserMedia({'audio':true}).then(function(s){ mss = ($1).createMediaStreamSource(s); mss.connect($2); console.log('SUCCESS2');})"
+  js_connectMic' :: AudioContext -> AudioNode -> IO ()

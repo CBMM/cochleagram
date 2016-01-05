@@ -155,7 +155,7 @@ cochlea ctx inputNode (CochleaConfig rng drng n dn l dl) = do
   filts     <- listWithKey filtspecs $ \freq filt -> do
     cochlearFilter ctx inputNode
       CochlearFilterConfig { _cfcFilter = filt
-                           , _cfcNSamples = constDyn 2048 }
+                           , _cfcNSamples = constDyn 512 }
 
   let getPowers reqs = performEvent $ ffor (tag (current filts) reqs) $ \cFilts ->
         traverse (\cf -> liftIO (js_getPower $ _cfAnalyserNode cf)) cFilts
