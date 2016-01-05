@@ -68820,8 +68820,10 @@ function h$$Xa()
   --h$sp;
   var b = a;
   var c = Math.log(b);
+  var d = Math.log(10.0);
+  var e = (c / d);
   h$p1(h$$Xb);
-  h$l4((10.0 * c), (-30.0), (-90.0), h$mainZCMainzizdwdblToInt);
+  h$l4((10.0 * e), (-30.0), (-90.0), h$mainZCMainzizdwdblToInt);
   return h$ap_3_3_fast();
 };
 function h$$W9()
@@ -69444,12 +69446,12 @@ var h$$alf = h$strta("Negative exponent");
 var h$$alg = h$strta("Osc Freq");
 var h$$alj = h$strta("Pattern match failure in do expression at exec\/Main.hs:86:3-10");
 var h$$alk = h$strta("Pattern match failure in do expression at exec\/Main.hs:87:3-10");
-var h$$mainZCMain_d5 = h$str("audio");
+var h$$mainZCMain_d7 = h$str("audio");
 function h$$Yh()
 {
   h$bh();
   h$r3 = 0;
-  h$r2 = h$$mainZCMain_d5();
+  h$r2 = h$$mainZCMain_d7();
   h$r1 = h$ghcjszuKc7TQ2cEDg1F5e5cgY2VukZCDataziJSStringziunpackCStringzh;
   return h$ap_1_2_fast();
 };
@@ -69559,12 +69561,12 @@ function h$$Yt()
   return h$ap_1_1_fast();
 };
 var h$$alB = h$strta("canvas");
-var h$$mainZCMain_el = h$str("2d");
+var h$$mainZCMain_en = h$str("2d");
 function h$$Yu()
 {
   h$bh();
   h$r3 = 0;
-  h$r2 = h$$mainZCMain_el();
+  h$r2 = h$$mainZCMain_en();
   h$r1 = h$ghcjszuKc7TQ2cEDg1F5e5cgY2VukZCDataziJSStringziunpackCStringzh;
   return h$ap_1_2_fast();
 };
@@ -74351,12 +74353,12 @@ function h$mainZCMainzizdszc1_e()
   h$l2(h$$alf, h$baseZCGHCziErrzierror);
   return h$ap_1_1_fast();
 };
-var h$$mainZCMain_i2 = h$str("rgba(255,255,255,0.05)");
+var h$$mainZCMain_i4 = h$str("rgba(255,255,255,0.05)");
 function h$mainZCMainzidraw2_e()
 {
   h$bh();
   h$r3 = 0;
-  h$r2 = h$$mainZCMain_i2();
+  h$r2 = h$$mainZCMain_i4();
   h$r1 = h$ghcjszuKc7TQ2cEDg1F5e5cgY2VukZCDataziJSStringziunpackCStringzh;
   return h$ap_1_2_fast();
 };
