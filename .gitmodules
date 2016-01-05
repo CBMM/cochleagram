@@ -1,3 +1,6 @@
 [submodule "deps/reflex-dom"]
 	path = deps/reflex-dom
 	url = http://github.com/imalsogreg/reflex-dom
+[submodule "dist/build/cochleagram/cochleagram.jsexe"]
+	path = dist/build/cochleagram/cochleagram.jsexe
+	url = git@github.com:imalsogreg/cochleagram.git

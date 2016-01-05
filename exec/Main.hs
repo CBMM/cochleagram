@@ -70,41 +70,41 @@ main' = do
   let freqs = fmap ((\(x :: Int) -> (x, show x)) . floor . ((2 :: Double) ^^)) [(5 :: Int) ..11] :: [(Int,String)]
   fftLen <- dropdown 2048 (constDyn (Data.Map.fromList freqs)) def
   el "br" $ return ()
-  text "Cochlear filter center freq"
-  cInput <- textInput $ def & textInputConfig_inputType .~ "range"
-                            & attributes .~ constDyn (   "min"  =: "100"
-                                                      <> "max"  =: "3000"
-                                                      <> "step" =: "0.01"
-                                                      <> "value" =: "500")
+  -- text "Cochlear filter center freq"
+  -- cInput <- textInput $ def & textInputConfig_inputType .~ "range"
+  --                           & attributes .~ constDyn (   "min"  =: "100"
+  --                                                     <> "max"  =: "3000"
+  --                                                     <> "step" =: "0.01"
+  --                                                     <> "value" =: "500")
 
   c <- liftIO newAudioContext
   let freq = fmapMaybe readMaybe (updated (value fInput))
 
   osc <- oscillatorNode c (OscillatorNodeConfig 440 freq)
 
-  -- Just win <- liftIO currentWindow
-  -- Just nav <- liftIO $ getNavigator win
-  -- b <- liftIO $ toJSVal True
-  -- myDict <- liftIO $ JO.create >>= \o -> JO.setProp "audio" b o >> return o
+  Just win <- liftIO currentWindow
+  Just nav <- liftIO $ getNavigator win
+  b <- liftIO $ toJSVal True
+  myDict <- liftIO $ JO.create >>= \o -> JO.setProp "audio" b o >> return o
   -- liftIO $ print''' $ Dictionary (jsval myDict)
-  g   <- gain c (GainConfig 0.01 (fmapMaybe readMaybe (updated (value gInput))))
+  g   <- gain c (GainConfig 0.1 (fmapMaybe readMaybe (updated (value gInput))))
 
-  -- mediaCallback <- liftIO $ newNavigatorUserMediaSuccessCallback $ \s -> do
-  --   case s of
-  --     Just stream -> do
-  --       Just src <- liftIO $ createMediaStreamSource c (Just stream)
-  --       liftIO $ Prelude.putStrLn "SUCCESS"
-  --       liftIO $ connect (castToAudioNode src) (Just g) 0 0
-  --     Nothing -> liftIO (putStrLn "SUCCESS NOTHING")
+  mediaCallback <- liftIO $ newNavigatorUserMediaSuccessCallback $ \s -> do
+    case s of
+      Just stream -> do
+        Just src <- liftIO $ createMediaStreamSource c (Just stream)
+        liftIO $ Prelude.putStrLn "SUCCESS"
+        liftIO $ connect (castToAudioNode src) (Just g) 0 0
+      Nothing -> liftIO (putStrLn "SUCCESS NOTHING")
 
-  -- failureCallback <- liftIO $ newNavigatorUserMediaErrorCallback $ \e -> do
-  --   case e of
-  --     Just err -> do
-  --       liftIO $ putStrLn "FAILURE"
-  --       liftIO $ print'' err
-  --     Nothing -> liftIO (putStrLn "FAILURE NOTHING")
+  failureCallback <- liftIO $ newNavigatorUserMediaErrorCallback $ \e -> do
+    case e of
+      Just err -> do
+        liftIO $ putStrLn "FAILURE"
+        liftIO $ print'' err
+      Nothing -> liftIO (putStrLn "FAILURE NOTHING")
 
-  -- webkitGetUserMedia nav (Just $ Dictionary (jsval myDict)) (Just mediaCallback) (Just failureCallback)
+  webkitGetUserMedia nav (Just $ Dictionary (jsval myDict)) (Just mediaCallback) (Just failureCallback)
   -- liftIO $ putStrLn "Did getUserMedia"
   -- stream2 <- liftIO $ getUserMedia nav (Just (Dictionary (jsval myDict)))
   -- Just src2 <- liftIO $ createMediaStreamSource c (Just stream2)
@@ -113,9 +113,9 @@ main' = do
   analyser <- analyserNode c def { _analyserNodeConfig_initial_smoothingTimeConstant = 0
                                  , _analyserNodeConfig_change_fftSize = updated (value fftLen)}
 
-  gFreq <- holdDyn 500 (fmapMaybe readMaybe (updated (value cInput)))
-  gFilt <- forDyn gFreq $ \f -> FGammaTone (GammaToneFilter 2 f 20 1)
-  cFilt <- cochlearFilter c (castToAudioNode g) (CochlearFilterConfig gFilt (value fftLen))
+  -- gFreq <- holdDyn 500 (fmapMaybe readMaybe (updated (value cInput)))
+  -- gFilt <- forDyn gFreq $ \f -> FGammaTone (GammaToneFilter 2 f 20 1)
+  -- cFilt <- cochlearFilter c (castToAudioNode g) (CochlearFilterConfig gFilt (value fftLen))
 
   fullCochlea <- cochlea c (castToAudioNode g) (CochleaConfig (100,3000) never 60 never True never)
 
@@ -126,8 +126,7 @@ main' = do
     connect g (Just dest) 0 0
     --connect (castToAudioNode $ _cfConvolverNode cFilt) (Just dest) 0 0
     connect g (Just (_analyser_node analyser)) 0 0
-    start osc 0
-  liftIO $ js_connectMic c (castToAudioNode g)
+    -- start osc 0
   text "Hello"
   canvEl <- fmap (castToHTMLCanvasElement . _el_element . fst) $
             elAttr' "canvas" ("id" =: "canvas" <> "width" =: "300" <> "height" =: "60" <> "image-rendering" =: "pixelated") $ return ()
@@ -141,26 +140,17 @@ main' = do
 
   el "br" $ return ()
 
-  clicks  <- button "squeeze"
-  clicks' <- button "shift"
-  performEvent (ffor clicks $ \() -> liftIO $ squeezeAppendColumn ctx' canvEl >> js_connectMic c (castToAudioNode g))
-  performEvent (ffor clicks' $ \_ -> liftIO $ shiftAppendColumn ctx')
+  -- clicks  <- button "squeeze"
+  -- clicks' <- button "shift"
+  -- performEvent (ffor clicks $ \() -> liftIO $ squeezeAppendColumn ctx' canvEl >> js_connectMic c (castToAudioNode g))
+  -- performEvent (ffor clicks' $ \_ -> liftIO $ shiftAppendColumn ctx')
   t0 <- liftIO Data.Time.getCurrentTime
   -- ticks <- tickLossy 0.015 t0
   ticks <- tickLossy 0.060 t0
-  spectra <- _analyser_getByteFrequencyData analyser (() <$ ticks)
+  -- spectra <- _analyser_getByteFrequencyData analyser (() <$ ticks)
   cochleaPowers <- _cochlea_getPowerData fullCochlea (() <$ ticks)
+  -- powers <- (_cfGetPower cFilt) (() <$ ticks)
 
-  -- performEvent (ffor spectra $ \a -> liftIO $ do
-  --                   a' <- js_clampUint8Array a
-  --                   img <- js_toGrayscale a'
-  --                   l <- js_lengthUint8ClampedArray' img
-  --                   imgData <- newImageData (Just img) 1 (fromIntegral $ l `div` 4)
-  --                   shiftAppendColumn ctx'
-  --                   putImageData ctx' (Just imgData) 290 0)
-
-  powers <- (_cfGetPower cFilt) (() <$ ticks)
-  -- performEvent (ffor powers $ \p -> liftIO $ print p)
   performEvent (ffor cochleaPowers $ \ps -> liftIO $ do
                     vs <- traverse toJSVal $ Prelude.map (dblToInt (-90) (-30) . toDb) $ elems ps
                     when (length vs > 0) $ do
@@ -171,10 +161,8 @@ main' = do
                       imgData <- newImageData (Just img) 1 (fromIntegral $ l `div` 4)
                       shiftAppendColumn ctx'
                       putImageData ctx' (Just imgData) 290 0)
-  -- performEvent (ffor cochleaPowers $ \ps -> liftIO $ print (maximum (ps <> 0 =: 0)))
 
   el "br" $ return ()
-  text "end"
 
 -- map double to 0-255 range
 dblToInt :: Double -> Double -> Double -> Int
@@ -191,8 +179,6 @@ draw ctx = do
 
 shiftAppendColumn :: CanvasRenderingContext2D -> IO ()
 shiftAppendColumn ctx = do
-  setFillStyle ctx (Just (CanvasStyle (jsval ("rgba(0,255,0,0.5)" :: JSString))))
-  fillRect ctx 50 50 10 10
   Just d <- getImageData ctx 1 0 300 150
   putImageData ctx (Just d) 0 0
 
