@@ -68821,7 +68821,7 @@ function h$$Xa()
   var b = a;
   var c = Math.log(b);
   h$p1(h$$Xb);
-  h$l4((20.0 * c), (-30.0), (-90.0), h$mainZCMainzizdwdblToInt);
+  h$l4((10.0 * c), (-30.0), (-90.0), h$mainZCMainzizdwdblToInt);
   return h$ap_3_3_fast();
 };
 function h$$W9()
