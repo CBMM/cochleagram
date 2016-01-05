@@ -1,6 +1,6 @@
 code size summary per package:
 
-base:                    518361
+base:                    510604
 cochl_4QTSBJNqORKKHm9l4coofu:89833
 conta_5w3UY4chXx62LVUOUrXeRm:164027
 deeps_IA8DgGbqfWcHYE0vChdRyn:615
@@ -9,10 +9,10 @@ depen_GZFfxs8A7WS3jvJthZg6p3:47745
 excep_Dt64kPlbg5dLPF70RHEAAf:4433
 ghc-prim:                24391
 ghcjs_B7KLFJ07Vte3zPHAgRIBTb:10933
-ghcjs_D7BYGeMTlMGF2My8KZzKUS:202018
+ghcjs_D7BYGeMTlMGF2My8KZzKUS:189447
 ghcjs_Kc7TQ2cEDg1F5e5cgY2Vuk:14738
 integer-gmp:             42875
-main:                    212353
+main:                    202535
 refle_7EFZfl0m4Fe8Nfy5veIevU:482050
 refle_HxIfaa8jgl1Efs0BJoROZl:489665
 reftf_JOU40Nd0lxyACBtr3v80Qj:1202
@@ -67,7 +67,7 @@ base
     GHC.IO.Handle.Types:                3834
     GHC.IORef:                          166
     GHC.Int:                            802
-    GHC.List:                           11447
+    GHC.List:                           10205
     GHC.MVar:                           188
     GHC.Num:                            2985
     GHC.Ptr:                            188
@@ -75,7 +75,7 @@ base
     GHC.Real:                           26665
     GHC.ST:                             186
     GHC.STRef:                          648
-    GHC.Show:                           13112
+    GHC.Show:                           6597
     GHC.Storable:                       1084
     GHC.TopHandler:                     10349
     GHC.Weak:                           188
@@ -137,8 +137,6 @@ ghcjs_D7BYGeMTlMGF2My8KZzKUS
     GHCJS.DOM.JSFFI.Generated.Node:     6721
     GHCJS.DOM.JSFFI.Generated.OscillatorNode:754
     GHCJS.DOM.JSFFI.Generated.Window:   1490
-    GHCJS.DOM.JSFFI.Navigator:          3084
-    GHCJS.DOM.JSFFI.NavigatorUserMediaError:9487
     GHCJS.DOM.Types:                    121135
 
 ghcjs_Kc7TQ2cEDg1F5e5cgY2Vuk
@@ -155,7 +153,7 @@ integer-gmp
     GHC.Integer.Type:                   42542
 
 main
-    Main:                               212353
+    Main:                               202535
 
 refle_7EFZfl0m4Fe8Nfy5veIevU
     Data.Functor.Misc:                  8785
@@ -200,5 +198,5 @@ trans_KzbnBSIEqPI2eU1Inn4mzm
 
 
 
-packed metadata: 454280
+packed metadata: 443842
 
