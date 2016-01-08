@@ -66545,7 +66545,7 @@ function h$$Tb()
   var d = Math.log(10.0);
   var e = (c / d);
   h$p1(h$$Tc);
-  h$l4((20.0 * e), (-30.0), (-90.0), h$mainZCMainzizdwdblToInt);
+  h$l4((20.0 * e), (-40.0), (-90.0), h$mainZCMainzizdwdblToInt);
   return h$ap_3_3_fast();
 };
 function h$$Ta()
@@ -66610,7 +66610,7 @@ function h$$Ti()
   var d = Math.log(10.0);
   var e = (c / d);
   h$p1(h$$Tj);
-  h$l4((20.0 * e), (-30.0), (-90.0), h$mainZCMainzizdwdblToInt);
+  h$l4((20.0 * e), (-40.0), (-90.0), h$mainZCMainzizdwdblToInt);
   return h$ap_3_3_fast();
 };
 function h$$Th()
