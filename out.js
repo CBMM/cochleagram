@@ -40334,8 +40334,8 @@ function h$$WW()
   return h$ap_gen_fast(3341);
 };
 var h$$aid = h$strta("value");
-var h$$aie = h$strta("1");
-var h$$aif = h$strta("0");
+var h$$aie = h$strta("5");
+var h$$aif = h$strta("0.1");
 function h$$WX()
 {
   h$bh();
@@ -41436,7 +41436,7 @@ function h$$Y8()
   h$l4(true, h$$ajp, h$baseZCGHCziIOziHandleziFDzistdout, h$baseZCGHCziIOziHandleziTextzihPutStr2);
   return h$ap_4_3_fast();
 };
-var h$$ajp = h$strta("Did getUserMedia7");
+var h$$ajp = h$strta("Did getUserMedia8");
 function h$$Y9()
 {
   h$bh();
