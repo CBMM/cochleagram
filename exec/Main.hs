@@ -219,7 +219,7 @@ foreign import javascript unsafe "new Uint8ClampedArray($1)"
   js_makeUint8ClampedArray :: JA.JSArray -> IO Uint8ClampedArray
 
 foreign import javascript unsafe
- "$r = new Uint8ClampedArray(($1).length * 4); for (var i = 0; i < ($1).length; i++) { var i0 = i*4; ($r)[i0] = ($1)[i]; ($r)[i0+1] = 255 - ($r)[i0]; ($r)[i0+2] = ($r)[i0]; ($r)[i0+3] = 255;}"
+ "$r = new Uint8ClampedArray(($1).length * 4); var l = ($1).length; for (var i = 0; i < l; i++) { var i0 = (l-i-1)*4; ($r)[i0] = ($1)[i]; ($r)[i0+1] = 255 - ($r)[i0]; ($r)[i0+2] = ($r)[i0]; ($r)[i0+3] = 255;}"
   js_toGrayscale :: Uint8ClampedArray -> IO Uint8ClampedArray
 
 foreign import javascript unsafe "console.log(($1).data[0])"
