@@ -40173,12 +40173,13 @@ function h$$WI()
   --h$sp;
   var b = a.d1;
   var c = new Uint8ClampedArray((b.length * 4));
-  for(var d = 0;(d < b.length);(d++)) {
-    var e = (d * 4);
-    c[e] = b[d];
-    c[(e + 1)] = (255 - c[e]);
-    c[(e + 2)] = c[e];
-    c[(e + 3)] = 255;
+  var d = b.length;
+  for(var e = 0;(e < d);(e++)) {
+    var f = (((d - e) - 1) * 4);
+    c[f] = b[e];
+    c[(f + 1)] = (255 - c[f]);
+    c[(f + 2)] = c[f];
+    c[(f + 3)] = 255;
   };
   h$r1 = h$c1(h$ghcjszmprimZCGHCJSziPrimziJSVal_con_e, c);
   return h$stack[h$sp];
@@ -43327,16 +43328,17 @@ function h$$acg()
   var d = new Uint8ClampedArray(c);
   var e = d;
   var f = new Uint8ClampedArray((e.length * 4));
-  for(var g = 0;(g < e.length);(g++)) {
-    var h = (g * 4);
-    f[h] = e[g];
-    f[(h + 1)] = (255 - f[h]);
-    f[(h + 2)] = f[h];
-    f[(h + 3)] = 255;
+  var g = e.length;
+  for(var h = 0;(h < g);(h++)) {
+    var i = (((g - h) - 1) * 4);
+    f[i] = e[h];
+    f[(i + 1)] = (255 - f[i]);
+    f[(i + 2)] = f[i];
+    f[(i + 3)] = 255;
   };
-  var i = f;
+  var j = f;
   h$pp6(f, h$$ach);
-  h$l3(4, i.length, h$ghczmprimZCGHCziClasseszidivIntzh);
+  h$l3(4, j.length, h$ghczmprimZCGHCziClasseszidivIntzh);
   return h$ap_2_2_fast();
 };
 function h$$acf()
@@ -45502,16 +45504,17 @@ function h$$afz()
   var d = new Uint8ClampedArray(c);
   var e = d;
   var f = new Uint8ClampedArray((e.length * 4));
-  for(var g = 0;(g < e.length);(g++)) {
-    var h = (g * 4);
-    f[h] = e[g];
-    f[(h + 1)] = (255 - f[h]);
-    f[(h + 2)] = f[h];
-    f[(h + 3)] = 255;
+  var g = e.length;
+  for(var h = 0;(h < g);(h++)) {
+    var i = (((g - h) - 1) * 4);
+    f[i] = e[h];
+    f[(i + 1)] = (255 - f[i]);
+    f[(i + 2)] = f[i];
+    f[(i + 3)] = 255;
   };
-  var i = f;
+  var j = f;
   h$pp6(f, h$$afA);
-  h$l3(4, i.length, h$ghczmprimZCGHCziClasseszidivIntzh);
+  h$l3(4, j.length, h$ghczmprimZCGHCziClasseszidivIntzh);
   return h$ap_2_2_fast();
 };
 function h$$afy()
