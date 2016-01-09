@@ -51,7 +51,7 @@ import Data.Map
 
 
 main :: IO ()
-main = mainWidget main'
+main = js_forceHttps >> mainWidget main'
 
 main' :: forall t m. MonadWidget t m => m ()
 main' = do
@@ -64,8 +64,8 @@ main' = do
                                                       <> "step" =: "0.01")
   el "br" $ return ()
   gInput <- textInput $ def & textInputConfig_inputType .~ "range"
-                            & attributes .~ constDyn (   "min"  =: "0"
-                                                      <> "max"  =: "1"
+                            & attributes .~ constDyn (   "min"  =: "0.1"
+                                                      <> "max"  =: "5"
                                                       <> "step" =: "0.01"
                                                       <> "value" =: "0.01")
   el "br" $ return ()
@@ -106,7 +106,7 @@ main' = do
         liftIO $ print'' err
       Nothing -> liftIO (putStrLn "FAILURE NOTHING")
 
-  liftIO $ putStrLn "Did getUserMedia7"
+  liftIO $ putStrLn "Did getUserMedia8"
   -- stream2 <- liftIO $ getUserMedia nav (Just (Dictionary (jsval myDict)))
   -- Just src2 <- liftIO $ createMediaStreamSource c (Just stream2)
   -- liftIO $ connect (castToAudioNode src2) (Just g) 0 0
@@ -134,7 +134,6 @@ main' = do
     -- js_connectMic  c (castToAudioNode g)
     when ("Firefox" `JS.isInfixOf` nm) $ putStrLn "FF" >> js_connectMic' c (castToAudioNode g)
     putStrLn "Test2"
-  text "Hello"
   canvEl <- fmap (castToHTMLCanvasElement . _el_element . fst) $
             elAttr' "canvas" ("id" =: "canvas"
                            <> "width" =: "100"
@@ -157,7 +156,7 @@ main' = do
   cochleaPowers <- _cochlea_getPowerData fullCochlea (() <$ ticks)
 
   performEvent (ffor cochleaPowers $ \ps -> liftIO $ do
-                    vs <- traverse toJSVal $ Prelude.map (dblToInt (-90) (-30) . toDb) $ elems ps
+                    vs <- traverse toJSVal $ Prelude.map (dblToInt (-90) (-40) . toDb) $ elems ps
                     when (length vs > 0) $ do
                       a' <- js_makeUint8ClampedArray (JA.fromList vs)
                       -- a' <- js_clampUint8Array a
@@ -219,7 +218,7 @@ foreign import javascript unsafe "new Uint8ClampedArray($1)"
   js_makeUint8ClampedArray :: JA.JSArray -> IO Uint8ClampedArray
 
 foreign import javascript unsafe
- "$r = new Uint8ClampedArray(($1).length * 4); var l = ($1).length; for (var i = 0; i < l; i++) { var i0 = (l-i-1)*4; ($r)[i0] = ($1)[i]; ($r)[i0+1] = 255 - ($r)[i0]; ($r)[i0+2] = ($r)[i0]; ($r)[i0+3] = 255;}"
+ "$r = new Uint8ClampedArray(($1).length * 4); function logC(x){ return(((Math.sqrt(x/255))*255)|0)}; var l = ($1).length; for (var i = 0; i < l; i++) { var i0 = (l-i-1)*4; ($r)[i0] = ($1)[i]; ($r)[i0+1] = ($1)[i]; ($r)[i0+2] = logC(($1)[i]); ($r)[i0+3] = 255;}"
   js_toGrayscale :: Uint8ClampedArray -> IO Uint8ClampedArray
 
 foreign import javascript unsafe "console.log(($1).data[0])"
@@ -239,3 +238,6 @@ foreign import javascript unsafe "navigator.userAgent"
 
 foreign import javascript unsafe "navigator.mediaDevices.getUserMedia({'audio':true}).then(function(s){ mss = ($1).createMediaStreamSource(s); mss.connect($2); console.log('SUCCESS2');})"
   js_connectMic' :: AudioContext -> AudioNode -> IO ()
+
+foreign import javascript unsafe "if (window.location.protocol != 'https:') { window.location.href = 'https:' + window.location.href.substring(window.location.protocol.length) }"
+  js_forceHttps :: IO ()
