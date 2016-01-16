@@ -1,12 +1,17 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE JavaScriptFFI #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module Main where
 
-import Control.Monad (when)
+import Control.Applicative (liftA3)
+import Control.Monad (join, when)
+import Data.Bool (bool)
 import qualified Data.JSString as JS
 import Data.Time (getCurrentTime)
 import Data.Monoid
@@ -32,7 +37,7 @@ import GHCJS.DOM.CanvasRenderingContext2D
 import GHCJS.DOM.ImageData
 import GHCJS.DOM.NavigatorUserMediaSuccessCallback
 import GHCJS.DOM.NavigatorUserMediaErrorCallback
-import GHCJS.DOM.Types
+import GHCJS.DOM.Types hiding (Event)
 import GHCJS.DOM.Enums
 import GHCJS.DOM.Navigator
 import GHCJS.DOM.Window
@@ -45,10 +50,46 @@ import Reflex
 import Text.Read (readMaybe)
 import Reflex.Dom hiding (setValue, restore)
 import Reflex.Dom.Time
+import Arithmetic
 import Cochlea
 import WebAudio
 import Data.Map
 
+data NumInputConfig = NumInputConfig {
+   numInputConfig_min          :: Double
+  ,numInputConfig_max          :: Double
+  ,numInputConfig_n            :: Int
+  ,numInputConfig_log          :: Bool
+  ,numInputConfig_sigfigs      :: Int
+  ,numInputConfig_initialValue :: Double
+  }
+
+numInput :: (MonadWidget t m)
+         => NumInputConfig
+         -> m (Dynamic t Double)
+numInput (NumInputConfig lo hi n isLog sigfigs x0) =
+  elClass "div" "num-input" $ do
+    let (rMin,rMax) = bool (lo, hi) (log lo, log hi) isLog
+        rStep       = (rMax - rMin) / (fromIntegral n - 1)
+        rVal        = bool x0 (log x0) isLog
+        mkRound     :: Double -> Double
+        mkRound     = (/ 10 ^^ sigfigs)
+                      . (fromIntegral :: Int -> Double)
+                      . round
+                      . (* 10 ^^ sigfigs)
+    nInput <- textInput $
+      def & textInputConfig_inputType  .~ "range"
+          & textInputConfig_attributes .~ constDyn
+            ( "min"   =: show rMin
+           <> "max"   =: show rMax
+           <> "step"  =: show rStep
+           <> "value" =: show rVal)
+    valNum <- holdDyn x0 $ fmap mkRound
+                         $ fmap (bool id exp isLog)
+                         $ fmapMaybe readMaybe
+                         $ (updated $ value nInput)
+    dynText =<< mapDyn show valNum
+    return valNum
 
 main :: IO ()
 main = js_forceHttps >> mainWidget main'
@@ -56,8 +97,21 @@ main = js_forceHttps >> mainWidget main'
 main' :: forall t m. MonadWidget t m => m ()
 main' = do
   pb <- getPostBuild
-  --freqTxt <- value <$> textInput def
-  text "Osc Freq"
+
+  let gain0 = 2
+  -- numInput (NumInputConfig 1 1000 7 True 0 10)
+  el "br" $ return ()
+  text "Mic Gain"
+  gainCoef <- numInput (NumInputConfig 0.01 10 33 True 2 gain0)
+  el "br" $ return ()
+
+  nFilts :: Dynamic t Int <- mapDyn floor =<< numInput (NumInputConfig 1 128 15 True 0 32)
+  text "Bandwidth Function"
+  bwInput <- textInput $ def (textInputConfig_initialValue .~ "x / 100")
+  let defBwFunc = (UPrim2 PDiv UVar (ULit 100.0))
+  bwFunc <- holdDyn (UPrim2 PDiv UVar (ULit 100.0)) $
+            fmapMaybe (hush . parseUexp) (updated (value bwInput))
+
   fInput <- textInput $ def & textInputConfig_inputType .~ "range"
                             & attributes .~ constDyn (   "min"  =: "500"
                                                       <> "max"  =: "2000"
@@ -69,77 +123,59 @@ main' = do
                                                       <> "step" =: "0.01"
                                                       <> "value" =: "0.01")
   el "br" $ return ()
+
+
   let freqs = fmap ((\(x :: Int) -> (x, show x)) . floor . ((2 :: Double) ^^)) [(5 :: Int) ..11] :: [(Int,String)]
   fftLen <- dropdown 2048 (constDyn (Data.Map.fromList freqs)) def
   el "br" $ return ()
-  -- text "Cochlear filter center freq"
-  -- cInput <- textInput $ def & textInputConfig_inputType .~ "range"
-  --                           & attributes .~ constDyn (   "min"  =: "100"
-  --                                                     <> "max"  =: "3000"
-  --                                                     <> "step" =: "0.01"
-  --                                                     <> "value" =: "500")
 
   c <- liftIO newAudioContext
-  let freq = fmapMaybe readMaybe (updated (value fInput))
 
-  osc <- oscillatorNode c (OscillatorNodeConfig 440 freq)
+  -- osc <- oscillatorNode c (OscillatorNodeConfig 440 freq)
 
   Just win <- liftIO currentWindow
   Just nav <- liftIO $ getNavigator win
   b <- liftIO $ toJSVal True
   myDict <- liftIO $ JO.create >>= \o -> JO.setProp "audio" b o >> return o
-  -- liftIO $ print''' $ Dictionary (jsval myDict)
-  g   <- gain c (GainConfig 0.1 (fmapMaybe readMaybe (updated (value gInput))))
+  g   <- gain c (GainConfig gain0 (updated gainCoef))
 
   mediaCallback <- liftIO $ newNavigatorUserMediaSuccessCallback $ \s -> do
     case s of
       Just stream -> do
         Just src <- liftIO $ createMediaStreamSource c (Just stream)
-        liftIO $ Prelude.putStrLn "SUCCESS"
         liftIO $ connect (castToAudioNode src) (Just g) 0 0
       Nothing -> liftIO (putStrLn "SUCCESS NOTHING")
 
   failureCallback <- liftIO $ newNavigatorUserMediaErrorCallback $ \e -> do
     case e of
-      Just err -> do
-        liftIO $ putStrLn "FAILURE"
-        liftIO $ print'' err
+      Just err -> liftIO $ print'' err
       Nothing -> liftIO (putStrLn "FAILURE NOTHING")
-
-  liftIO $ putStrLn "Did getUserMedia8"
-  -- stream2 <- liftIO $ getUserMedia nav (Just (Dictionary (jsval myDict)))
-  -- Just src2 <- liftIO $ createMediaStreamSource c (Just stream2)
-  -- liftIO $ connect (castToAudioNode src2) (Just g) 0 0
 
   analyser <- analyserNode c def { _analyserNodeConfig_initial_smoothingTimeConstant = 0
                                  , _analyserNodeConfig_change_fftSize = updated (value fftLen)}
 
-  -- gFreq <- holdDyn 500 (fmapMaybe readMaybe (updated (value cInput)))
-  -- gFilt <- forDyn gFreq $ \f -> FGammaTone (GammaToneFilter 2 f 20 1)
-  -- cFilt <- cochlearFilter c (castToAudioNode g) (CochlearFilterConfig gFilt (value fftLen))
-
-  fullCochlea <- cochlea c (castToAudioNode g) (CochleaConfig (300,3000) never 60 never True never)
+  -- TODO
+  fullCochlea <- cochlea c (castToAudioNode g)
+                         (CochleaConfig (100,3000) never 32 (updated nFilts) True never defBwFunc (updated bwFunc))
 
   liftIO $ do
     --connect mic (Just g) 0 0
-    connect osc (Just g) 0 0
+    -- connect osc (Just g) 0 0
     Just dest <- getDestination c
-    connect g (Just dest) 0 0
+    -- connect g (Just dest) 0 0
     --connect (castToAudioNode $ _cfConvolverNode cFilt) (Just dest) 0 0
     connect g (Just (_analyser_node analyser)) 0 0
     -- start osc 0
     nm <- js_userAgent
     when ("Chrome" `JS.isInfixOf` nm)  $ putStrLn "Chrome" >>
       webkitGetUserMedia nav (Just $ Dictionary (jsval myDict)) (Just mediaCallback) (Just failureCallback)
-    -- js_connectMic  c (castToAudioNode g)
     when ("Firefox" `JS.isInfixOf` nm) $ putStrLn "FF" >> js_connectMic' c (castToAudioNode g)
     putStrLn "Test2"
   canvEl <- fmap (castToHTMLCanvasElement . _el_element . fst) $
             elAttr' "canvas" ("id" =: "canvas"
                            <> "width" =: "100"
-                           <> "height" =: "60"
-                           <> "image-rendering" =: "pixelated"
-                           <> "style" =: "height:200px") $ return ()
+                           <> "height" =: "128"
+                           <> "style" =: "height:256;image-rendering:pixelated") $ return ()
   ctx'' <- liftIO $ GHCJS.DOM.HTMLCanvasElement.getContext
            canvEl ("2d" :: JSString)
   Just ctx' :: Maybe CanvasRenderingContext2D <- liftIO $ fromJSVal ctx''
@@ -153,20 +189,62 @@ main' = do
 
   t0 <- liftIO Data.Time.getCurrentTime
   ticks <- tickLossy 0.033 t0
-  cochleaPowers <- _cochlea_getPowerData fullCochlea (() <$ ticks)
 
-  performEvent (ffor cochleaPowers $ \ps -> liftIO $ do
-                    vs <- traverse toJSVal $ Prelude.map (dblToInt (-90) (-40) . toDb) $ elems ps
-                    when (length vs > 0) $ do
-                      a' <- js_makeUint8ClampedArray (JA.fromList vs)
-                      -- a' <- js_clampUint8Array a
-                      img <- js_toGrayscale a'
-                      l <- js_lengthUint8ClampedArray' img
+  let defEq = UPrim2 PDiv
+              (UPrim2 PDiff (UPrim2 PProd (ULit 20.0) (UPrim1 PLog10 UVar))
+               (UPrim1 PNegate (ULit 90.0)))
+              (UPrim2 PDiff (UPrim1 PNegate (ULit 40.0)) (UPrim1 PNegate (ULit 90.0)))
+      defStr = "(20 * log10 x - (-90)) / ((-40) - (-90))"
+
+  rInp <- textInput $ def & textInputConfig_initialValue .~ defStr
+  rFunc <- holdDyn defEq $ fmapMaybe (hush . parseUexp) (updated (value rInp))
+  gInp <- textInput $ def & textInputConfig_initialValue .~ defStr
+  gFunc <- holdDyn defEq $ fmapMaybe (hush. parseUexp) (updated (value gInp))
+  bInp <- textInput $ def & textInputConfig_initialValue .~ defStr
+  bFunc <- holdDyn defEq $ fmapMaybe (hush. parseUexp) (updated (value bInp))
+
+  cFuncs <- $(qDyn [| ( $(unqDyn [|rFunc|]), $(unqDyn [|gFunc|]), $(unqDyn [|bFunc|])) |])
+
+  let applyExpr e xs = Prelude.map (flip ueval e) xs
+
+  -- let powers = ffor fullCochlea _cochlea_getPowerData :: Event t (Event t () -> m (Event t (Map Double Double)))
+  -- dynPowers <- holdDyn (\_ -> never) powers
+  -- powerGetter <- _cochlea_getPowerData fullCochlea
+  cochleaPowers <- _cochlea_getPowerData fullCochlea (() <$ ticks)
+  let cochleaColors = attachWith (\(fR,fG,fB) ps ->
+        let cs = elems ps
+            cR = applyExpr fR cs
+            cG = applyExpr fG cs
+            cB = applyExpr fB cs
+        in  (cR,cG,cB)) (current cFuncs) cochleaPowers
+
+  -- performEvent (ffor cochleaPowers $ \ps -> liftIO $ do
+  --                   vs <- traverse toJSVal $ Prelude.map (dblToInt (-90) (-40) . toDb) $ elems ps
+  --                   when (length vs > 0) $ do
+  --                     a' <- js_makeUint8ClampedArray (JA.fromList vs)
+  --                     -- a' <- js_clampUint8Array a
+  --                     img <- js_toGrayscale a'
+  --                     l <- js_lengthUint8ClampedArray' img
+  --                     imgData <- newImageData (Just img) 1 (fromIntegral $ l `div` 4)
+  --                     shiftAppendColumn ctx'
+  --                     putImageData ctx' (Just imgData) 99 0)
+
+  performEvent (ffor cochleaColors $ \(rs,gs,bs) -> liftIO $ do
+                    when (length rs > 0) $ do
+                      let toClamped :: [Double] -> IO Uint8ClampedArray
+                          toClamped xs = (js_makeUint8ClampedArray . JA.fromList) =<< traverse (toJSVal . (* 255)) xs
+                      r <- toClamped rs
+                      g <- toClamped gs
+                      b <- toClamped bs
+                      img :: Uint8ClampedArray <- js_zip_colors r g b
+                      -- l <- js_lengthUint8ClampedArray' img
+                      let l = length rs * 4
                       imgData <- newImageData (Just img) 1 (fromIntegral $ l `div` 4)
                       shiftAppendColumn ctx'
                       putImageData ctx' (Just imgData) 99 0)
 
   el "br" $ return ()
+
 
   -- ticks60 <- tickLossy 0.015 t0
   -- lightLevels <- foldDyn
@@ -197,6 +275,10 @@ dblToInt lo hi x = let x' = min hi (max lo x)
 toDb :: Double -> Double
 toDb x = 20 * logBase 10 x
 
+hush :: Either l r -> Maybe r
+hush (Left _)  = Nothing
+hush (Right r) = Just r
+
 draw :: CanvasRenderingContext2D -> IO ()
 draw ctx = do
   setFillStyle ctx (Just $ CanvasStyle $ jsval ("rgba(255,255,255,0.05)" :: JSString))
@@ -204,7 +286,7 @@ draw ctx = do
 
 shiftAppendColumn :: CanvasRenderingContext2D -> IO ()
 shiftAppendColumn ctx = do
-  Just d <- getImageData ctx 1 0 100 60
+  Just d <- getImageData ctx 1 0 100 128
   putImageData ctx (Just d) 0 0
 
 squeezeAppendColumn :: CanvasRenderingContext2D -> HTMLCanvasElement -> IO ()
@@ -214,12 +296,16 @@ squeezeAppendColumn ctx canv = do
   drawImageFromCanvas ctx (Just canv) 0 0
   restore ctx
 
-foreign import javascript unsafe "new Uint8ClampedArray($1)"
+foreign import javascript unsafe "$r = new Uint8ClampedArray($1)"
   js_makeUint8ClampedArray :: JA.JSArray -> IO Uint8ClampedArray
 
 foreign import javascript unsafe
  "$r = new Uint8ClampedArray(($1).length * 4); function logC(x){ return(((Math.sqrt(x/255))*255)|0)}; var l = ($1).length; for (var i = 0; i < l; i++) { var i0 = (l-i-1)*4; ($r)[i0] = ($1)[i]; ($r)[i0+1] = ($1)[i]; ($r)[i0+2] = logC(($1)[i]); ($r)[i0+3] = 255;}"
   js_toGrayscale :: Uint8ClampedArray -> IO Uint8ClampedArray
+
+foreign import javascript unsafe
+ "$r = new Uint8ClampedArray(($1).length * 4); var l = ($1).length; for (var i = 0; i < l; i++) { var i0 = (l - i - 1) * 4; ($r)[i0] = ($1)[i]; ($r)[i0+1] = ($2)[i]; ($r)[i0+2] = ($3)[i]; ($r)[i0+3] = 255;}"
+   js_zip_colors :: Uint8ClampedArray -> Uint8ClampedArray -> Uint8ClampedArray -> IO Uint8ClampedArray
 
 foreign import javascript unsafe "console.log(($1).data[0])"
   print' :: ImageData -> IO ()

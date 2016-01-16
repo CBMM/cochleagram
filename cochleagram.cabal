@@ -17,6 +17,7 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:     WebAudio
+                       Arithmetic
                        Cochlea
                        Types
   -- other-modules:       
@@ -28,6 +29,7 @@ library
                        text,
                        ghcjs-base >= 0.2 && < 0.3,
                        ghcjs-dom >= 0.2 && < 0.3,
+                       parsec,
                        reflex,
                        reflex-dom,
                        time,

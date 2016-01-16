@@ -20,6 +20,7 @@ import GHCJS.DOM.AudioBuffer
 import GHCJS.Marshal
 import qualified JavaScript.Array as JA
 import WebAudio
+import Arithmetic
 
 
 data GammaToneFilter = GammaToneFilter
@@ -116,12 +117,14 @@ cochlearFilter ctx inputNode (CochlearFilterConfig filt nSamp) = mdo
   return cFilter
 
 data CochleaConfig t = CochleaConfig
-  { _cochleaConfig_initial_freqRange :: (Double,Double)
-  , _cochleaConfig_change_freqRange  :: Event t (Double,Double)
-  , _cochleaConfig_initial_nFreq     :: Int
-  , _cochleaConfig_change_nFreq      :: Event t Int
-  , _cochleaConfig_initial_logSpace  :: Bool
-  , _cochleaConfig_change_logSpace   :: Event t Bool
+  { _cochleaConfig_initial_freqRange  :: (Double,Double)
+  , _cochleaConfig_change_freqRange   :: Event t (Double,Double)
+  , _cochleaConfig_initial_nFreq      :: Int
+  , _cochleaConfig_change_nFreq       :: Event t Int
+  , _cochleaConfig_initial_logSpace   :: Bool
+  , _cochleaConfig_change_logSpace    :: Event t Bool
+  , _cochleaConfig_initial_bwFunction :: UExp
+  , _cochleaConfig_change_bwFunction  :: Event t UExp
   }
 
 data Cochlea t m = Cochlea
@@ -129,8 +132,8 @@ data Cochlea t m = Cochlea
   , _cochlea_filters      :: Dynamic t (Map Double (CochlearFilter t m))
   }
 
-freqSpace :: (Double, Double) -> Int -> Bool -> Map Double Filter
-freqSpace (freq1,freqN) n True =
+freqSpace :: (Double, Double) -> Int -> Bool -> UExp -> Map Double Filter
+freqSpace (freq1,freqN) n True bwFunc =
   fromList $ zipWith (\f b -> (f, FGammaTone (GammaToneFilter 2 f b 1))) freqs bws
   where lf1   = log freq1
         lfN   = log freqN
@@ -140,18 +143,21 @@ freqSpace (freq1,freqN) n True =
         inds  = Prelude.map (\f -> log f / dFr) freqs
         -- bws   = 200 <$ freqs
         -- bws   = zipWith (\i _ -> exp (i * dFr)) inds freqs
-        bws   = Prelude.map (\f -> f * dFr / 2) freqs
+        -- bws   = Prelude.map (\f -> f * dFr / 2) freqs
+        bws   = Prelude.map (flip ueval bwFunc) freqs
         -- bws   = (\f -> 24.7 * (4.37 * f / 1000 + 1)) <$> freqs
 
 cochlea :: MonadWidget t m => AudioContext -> AudioNode -> CochleaConfig t -> m (Cochlea t m)
-cochlea ctx inputNode (CochleaConfig rng drng n dn l dl) = do
+cochlea ctx inputNode (CochleaConfig rng drng n dn l dl f df) = do
 
   frange    <- holdDyn rng drng
   nfilts    <- holdDyn n   dn
   logspace  <- holdDyn l   dl
+  bwFunc    <- holdDyn f   df
   filtspecs <- $(qDyn [| freqSpace $(unqDyn [|frange|])
                                    $(unqDyn [|nfilts|])
                                    $(unqDyn [|logspace|])
+                                   $(unqDyn [|bwFunc|])
                       |])
   filts     <- listWithKey filtspecs $ \freq filt -> do
     cochlearFilter ctx inputNode
