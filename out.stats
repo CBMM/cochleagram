@@ -1,7 +1,7 @@
 code size summary per package:
 
-base:                    604686
-cochl_67Qx6p7CtPAHDQVStZlTo7:124342
+base:                    606602
+cochl_67Qx6p7CtPAHDQVStZlTo7:153098
 conta_5w3UY4chXx62LVUOUrXeRm:164664
 deeps_IA8DgGbqfWcHYE0vChdRyn:615
 depen_3ZazWrAF611CC0pGA27xUj:2889
@@ -12,8 +12,8 @@ ghcjs_B7KLFJ07Vte3zPHAgRIBTb:10933
 ghcjs_D7BYGeMTlMGF2My8KZzKUS:187802
 ghcjs_Kc7TQ2cEDg1F5e5cgY2Vuk:14738
 integer-gmp:             43525
-main:                    244126
-parse_2IIEIBfTu54BzyNlmha4Z7:529576
+main:                    244106
+parse_2IIEIBfTu54BzyNlmha4Z7:529881
 refle_7EFZfl0m4Fe8Nfy5veIevU:481154
 refle_HxIfaa8jgl1Efs0BJoROZl:489521
 reftf_JOU40Nd0lxyACBtr3v80Qj:1202
@@ -51,7 +51,7 @@ base
     GHC.Enum:                           19566
     GHC.Err:                            382
     GHC.Exception:                      9546
-    GHC.Float:                          72574
+    GHC.Float:                          74490
     GHC.Float.RealFracMethods:          300
     GHC.Foreign:                        12136
     GHC.ForeignPtr:                     1501
@@ -94,8 +94,8 @@ base
     Text.Read.Lex:                      82904
 
 cochl_67Qx6p7CtPAHDQVStZlTo7
-    Arithmetic:                         38714
-    Cochlea:                            61466
+    Arithmetic:                         67469
+    Cochlea:                            61467
     WebAudio:                           24162
 
 conta_5w3UY4chXx62LVUOUrXeRm
@@ -160,13 +160,13 @@ integer-gmp
     GHC.Integer.Type:                   43192
 
 main
-    Main:                               244126
+    Main:                               244106
 
 parse_2IIEIBfTu54BzyNlmha4Z7
     Text.Parsec.Char:                   21390
     Text.Parsec.Combinator:             30369
     Text.Parsec.Error:                  10625
-    Text.Parsec.Expr:                   71155
+    Text.Parsec.Expr:                   71460
     Text.Parsec.Language:               7319
     Text.Parsec.Pos:                    2189
     Text.Parsec.Prim:                   27705
@@ -215,5 +215,5 @@ trans_KzbnBSIEqPI2eU1Inn4mzm
 
 
 
-packed metadata: 537091
+packed metadata: 544397
 
