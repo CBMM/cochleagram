@@ -13,37 +13,50 @@ import Text.Parsec.String
 import Text.Parsec.Token   hiding (parens)
 -- import Text.Attoparsec
 
-data Prim2 = PSum | PDiff | PProd | PDiv
+data Prim2 = PSum | PDiff | PProd | PDiv | PRange | PPow
   deriving (Eq, Show)
 
-data Prim1 = PNegate | PExpE | PExp10 | PLogE | PLog10
+data Prim1 = PNegate | PExpE | PExp10 | PLogE | PLog10 | PToDb
   deriving (Eq, Show)
 
-evalPrim2 :: Prim2 -> Double -> Double -> Double
-evalPrim2 PSum = (+)
-evalPrim2 PDiff = (-)
-evalPrim2 PProd = (*)
-evalPrim2 PDiv  = (/)
+evalPrim2 :: Prim2 -> UVal -> UVal -> UVal
+evalPrim2 PSum (VLit x) (VLit y) = VLit $ (+) x y
+evalPrim2 PDiff (VLit x) (VLit y) = VLit $ (-) x y
+evalPrim2 PProd (VLit x) (VLit y) = VLit $ (*) x y
+evalPrim2 PDiv  (VLit x) (VLit y) = VLit $ (/) x y
+evalPrim2 PRange (VLit x) (VPair lo hi) = VLit $ (x-lo)/(hi-lo)
+evalPrim2 PPow (VLit x) (VLit y) = VLit $ x ** y
 
-evalPrim1 :: Prim1 -> Double -> Double
-evalPrim1 PNegate = negate
-evalPrim1 PExpE = exp
-evalPrim1 PExp10 = (10 **)
-evalPrim1 PLogE = log
-evalPrim1 PLog10 = logBase 10
+evalPrim1 :: Prim1 -> UVal -> UVal
+evalPrim1 PNegate (VLit x) = VLit $ negate x
+evalPrim1 PExpE (VLit x) = VLit $ exp x
+evalPrim1 PExp10 (VLit x) = VLit $ (10 **) x
+evalPrim1 PLogE (VLit x) = VLit $ log x
+evalPrim1 PLog10 (VLit x) = VLit $ logBase 10 x
+evalPrim1 PToDb (VLit x) = VLit $ (20 *) . logBase 10 $ x
 
 
 data UExp = ULit Double
           | UVar
           | UPrim2 Prim2 UExp UExp
           | UPrim1 Prim1 UExp
+          | UPair  UExp  UExp
   deriving (Eq, Show)
 
-ueval :: Double -> UExp -> Double
-ueval x (ULit a) = a
-ueval x UVar     = x
+ueval :: Double -> UExp -> UVal
+ueval _ (ULit a) = VLit a
+ueval _ (UPair (ULit a) (ULit b)) = VPair a b
+ueval x UVar     = VLit x
 ueval x (UPrim2 o a b) = evalPrim2 o (ueval x a) (ueval x b)
 ueval x (UPrim1 o a) = evalPrim1 o (ueval x a)
+
+uevalD :: Double -> UExp -> Double
+uevalD x e = case ueval x e of
+  VLit d -> d
+  _      -> error "Arithmetic type error"
+
+data UVal = VLit Double
+          | VPair Double Double
 
 parseUexp :: String -> Either String UExp
 parseUexp s = bimap show id $ parse expr "string" s
@@ -54,7 +67,8 @@ ptest p s = show $ bimap show id $ parse p "test" s
 expr = buildExpressionParser opTable term
        <?> "expression"
 
-term = (between (char '(') (char ')') expr
+term = try litPair
+       <|> try (between (char '(') (char ')') expr
        <|> lit
        <|> (char 'x' >> pure UVar)) <* spaces
        <?> "simple expression"
@@ -64,22 +78,29 @@ opTable = [ [prefix "-" (UPrim1 PNegate),
              prefix "log10" (UPrim1 PLog10),
              prefix "log" (UPrim1 PLogE),
              prefix "exp10" (UPrim1 PExp10),
-             prefix "exp" (UPrim1 PExpE)]
+             prefix "exp" (UPrim1 PExpE),
+             postfix "dB" (UPrim1 PToDb)]
+          , [binary "^" (UPrim2 PPow) AssocLeft]
           , [binary "*" (UPrim2 PProd) AssocLeft,
              binary "/" (UPrim2 PDiv) AssocLeft]
           , [binary "+" (UPrim2 PSum) AssocLeft,
-             binary "-" (UPrim2 PDiff) AssocLeft]
+             binary "-" (UPrim2 PDiff) AssocLeft,
+             binary "->" (UPrim2 PRange) AssocLeft]
           ]
 
 binary name fun assoc = Infix (do{ reservedOp tokP name; return fun}) assoc
 prefix name fun = Prefix (do{reservedOp tokP name; return fun})
+postfix name fun = Postfix (do{reservedOp tokP name; return fun})
 
--- expr :: Parser UExp
--- --expr = parens <|> prim1 <|> lit <|> prim2 <|> var
--- expr = lit <|> var <|> prim2 <|> parens
+litPair :: Parser UExp
+litPair = between (char '(') (char ')') $ do
+  l1 <- lit
+  spaces
+  char ','
+  spaces
+  l2 <- lit
+  return $ UPair l1 l2
 
--- parens :: Parser UExp
--- parens = char '(' *> spaces *> expr <* spaces <* char ')'
 
 lit :: Parser UExp
 lit = do

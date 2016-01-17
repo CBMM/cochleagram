@@ -144,7 +144,7 @@ freqSpace (freq1,freqN) n True bwFunc =
         -- bws   = 200 <$ freqs
         -- bws   = zipWith (\i _ -> exp (i * dFr)) inds freqs
         -- bws   = Prelude.map (\f -> f * dFr / 2) freqs
-        bws   = Prelude.map (flip ueval bwFunc) freqs
+        bws   = Prelude.map (flip uevalD bwFunc) freqs
         -- bws   = (\f -> 24.7 * (4.37 * f / 1000 + 1)) <$> freqs
 
 cochlea :: MonadWidget t m => AudioContext -> AudioNode -> CochleaConfig t -> m (Cochlea t m)

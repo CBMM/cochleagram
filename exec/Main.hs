@@ -156,7 +156,7 @@ main' = do
 
   -- TODO
   fullCochlea <- cochlea c (castToAudioNode g)
-                         (CochleaConfig (100,3000) never 32 (updated nFilts) True never defBwFunc (updated bwFunc))
+                         (CochleaConfig (100,5000) never 32 (updated nFilts) True never defBwFunc (updated bwFunc))
 
   liftIO $ do
     --connect mic (Just g) 0 0
@@ -175,7 +175,7 @@ main' = do
             elAttr' "canvas" ("id" =: "canvas"
                            <> "width" =: "100"
                            <> "height" =: "128"
-                           <> "style" =: "height:256;image-rendering:pixelated") $ return ()
+                           <> "style" =: "height:256px;") $ return ()
   ctx'' <- liftIO $ GHCJS.DOM.HTMLCanvasElement.getContext
            canvEl ("2d" :: JSString)
   Just ctx' :: Maybe CanvasRenderingContext2D <- liftIO $ fromJSVal ctx''
@@ -190,11 +190,8 @@ main' = do
   t0 <- liftIO Data.Time.getCurrentTime
   ticks <- tickLossy 0.033 t0
 
-  let defEq = UPrim2 PDiv
-              (UPrim2 PDiff (UPrim2 PProd (ULit 20.0) (UPrim1 PLog10 UVar))
-               (UPrim1 PNegate (ULit 90.0)))
-              (UPrim2 PDiff (UPrim1 PNegate (ULit 40.0)) (UPrim1 PNegate (ULit 90.0)))
-      defStr = "(20 * log10 x - (-90)) / ((-40) - (-90))"
+  let defEq = UPrim2 PPow (UPrim2 PRange (UPrim1 PToDb UVar) (UPair (ULit (-90)) (ULit (-50)))) (ULit 2)
+      defStr = "(x dB -> (-90,-50))^2"
 
   rInp <- textInput $ def & textInputConfig_initialValue .~ defStr
   rFunc <- holdDyn defEq $ fmapMaybe (hush . parseUexp) (updated (value rInp))
@@ -205,11 +202,8 @@ main' = do
 
   cFuncs <- $(qDyn [| ( $(unqDyn [|rFunc|]), $(unqDyn [|gFunc|]), $(unqDyn [|bFunc|])) |])
 
-  let applyExpr e xs = Prelude.map (flip ueval e) xs
+  let applyExpr e xs = Prelude.map (flip uevalD e) xs
 
-  -- let powers = ffor fullCochlea _cochlea_getPowerData :: Event t (Event t () -> m (Event t (Map Double Double)))
-  -- dynPowers <- holdDyn (\_ -> never) powers
-  -- powerGetter <- _cochlea_getPowerData fullCochlea
   cochleaPowers <- _cochlea_getPowerData fullCochlea (() <$ ticks)
   let cochleaColors = attachWith (\(fR,fG,fB) ps ->
         let cs = elems ps
@@ -217,17 +211,6 @@ main' = do
             cG = applyExpr fG cs
             cB = applyExpr fB cs
         in  (cR,cG,cB)) (current cFuncs) cochleaPowers
-
-  -- performEvent (ffor cochleaPowers $ \ps -> liftIO $ do
-  --                   vs <- traverse toJSVal $ Prelude.map (dblToInt (-90) (-40) . toDb) $ elems ps
-  --                   when (length vs > 0) $ do
-  --                     a' <- js_makeUint8ClampedArray (JA.fromList vs)
-  --                     -- a' <- js_clampUint8Array a
-  --                     img <- js_toGrayscale a'
-  --                     l <- js_lengthUint8ClampedArray' img
-  --                     imgData <- newImageData (Just img) 1 (fromIntegral $ l `div` 4)
-  --                     shiftAppendColumn ctx'
-  --                     putImageData ctx' (Just imgData) 99 0)
 
   performEvent (ffor cochleaColors $ \(rs,gs,bs) -> liftIO $ do
                     when (length rs > 0) $ do
