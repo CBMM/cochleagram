@@ -13,6 +13,7 @@ import Control.Applicative (liftA3)
 import Control.Monad (join, when)
 import Data.Bool (bool)
 import qualified Data.JSString as JS
+import Data.Maybe (isJust)
 import Data.Time (getCurrentTime)
 import Data.Monoid
 import GHCJS.Foreign
@@ -44,6 +45,7 @@ import GHCJS.DOM.Window
 import qualified JavaScript.Web.Canvas as C
 import qualified JavaScript.Array as JA
 import qualified JavaScript.Object as JO
+import qualified Text.PrettyPrint as Pretty
 
 import Control.Monad.IO.Class
 import Reflex
@@ -91,6 +93,19 @@ numInput (NumInputConfig lo hi n isLog sigfigs x0) =
     dynText =<< mapDyn show valNum
     return valNum
 
+funExprInput :: MonadWidget t m => UExp -> TextInputConfig t -> m (Dynamic t UExp)
+funExprInput exp0 inConfig = mdo
+  let pExp0 = Pretty.render $ pp exp0
+  boxAttrs <- combineDyn
+         (\ats e ->  ats <> "class" =: bool "expr expr-bad" "expr expr-good" (isJust e))
+         (_textInputConfig_attributes inConfig) textExpr
+  eInp     <- textInput def { _textInputConfig_initialValue = pExp0
+                            , _textInputConfig_attributes   = boxAttrs
+                            }
+  textExpr <- mapDyn (hush . parseUexp) (value eInp)
+  outExp   <- holdDyn exp0 $ fmapMaybe id (updated textExpr)
+  return outExp
+
 main :: IO ()
 main = js_forceHttps >> mainWidget main'
 
@@ -98,135 +113,152 @@ main' :: forall t m. MonadWidget t m => m ()
 main' = do
   pb <- getPostBuild
 
-  let gain0 = 2
-  el "br" $ return ()
-  text "Mic Gain"
-  gainCoef <- numInput (NumInputConfig 0.01 10 33 True 2 gain0)
-  el "br" $ return ()
+  (fullCochlea, c, cFuncs, ticks) <- elClass "div" "controls" $ do
+    let gain0 = 8
+    el "br" $ return ()
+    text "Mic Gain"
+    gainCoef <- numInput (NumInputConfig 0.01 10 33 True 2 gain0)
+    el "br" $ return ()
 
-  text "Freq 1"
-  filtsLo  <- numInput (NumInputConfig 0.1 1000 300 True 2 100)
-  el "br" $ return ()
+    text "Freq 1"
+    filtsLo  <- numInput (NumInputConfig 0.1 1000 300 True 2 100)
+    el "br" $ return ()
 
-  text "Freq n"
-  filtsHi <- numInput (NumInputConfig 0.1 10000 300 True 2 5000)
-  el "br" $ return ()
+    text "Freq n"
+    filtsHi <- numInput (NumInputConfig 0.1 10000 300 True 2 5000)
+    el "br" $ return ()
 
-  text "N Filts"
-  nFilts  <- mapDyn floor =<< numInput (NumInputConfig 1 128 15 True 0 32)
-  el "br" $ return ()
+    text "N Filts"
+    nFilts  <- mapDyn floor =<< numInput (NumInputConfig 1 128 15 True 0 64)
+    el "br" $ return ()
 
-  filtsRange <- combineDyn (,) filtsLo filtsHi
+    filtsRange <- combineDyn (,) filtsLo filtsHi
 
-  text "Bandwidth Function"
-  bwInput <- textInput $
-             def & textInputConfig_initialValue .~ "x / 100"
-                 & textInputConfig_attributes   .~ constDyn ("placeholder" =: "x / 100")
-  let defBwFunc = (UPrim2 PDiv UVar (ULit 100.0))
-  bwFunc <- holdDyn (UPrim2 PDiv UVar (ULit 100.0)) $
-            fmapMaybe (hush . parseUexp) (updated (value bwInput))
+    text "Bandwidth Function"
+    let defBwFunc = (UPrim2 PDiv UVar (ULit 100))
+    bwFunc <- funExprInput defBwFunc def
 
 
-  el "br" $ return ()
+    el "br" $ return ()
 
-  c <- liftIO newAudioContext
+    c <- liftIO newAudioContext
 
-  -- osc <- oscillatorNode c (OscillatorNodeConfig 440 freq)
+    g   <- gain c (GainConfig gain0 (updated gainCoef))
 
-  Just win <- liftIO currentWindow
-  Just nav <- liftIO $ getNavigator win
-  b <- liftIO $ toJSVal True
-  myDict <- liftIO $ JO.create >>= \o -> JO.setProp "audio" b o >> return o
-  g   <- gain c (GainConfig gain0 (updated gainCoef))
+    fullCochlea <- cochlea c (castToAudioNode g)
+                   (CochleaConfig (100,5000) (updated filtsRange)
+                    64 (updated nFilts)
+                    True never
+                    defBwFunc (updated bwFunc))
 
-  mediaCallback <- liftIO $ newNavigatorUserMediaSuccessCallback $ \s -> do
-    case s of
-      Just stream -> do
-        Just src <- liftIO $ createMediaStreamSource c (Just stream)
-        liftIO $ connect (castToAudioNode src) (Just g) 0 0
-      Nothing -> liftIO (putStrLn "SUCCESS NOTHING")
+    -- osc <- oscillatorNode c (OscillatorNodeConfig 440 freq)
 
-  failureCallback <- liftIO $ newNavigatorUserMediaErrorCallback $ \e -> do
-    case e of
-      Just err -> liftIO $ print'' err
-      Nothing -> liftIO (putStrLn "FAILURE NOTHING")
+    Just win <- liftIO currentWindow
+    Just nav <- liftIO $ getNavigator win
+    b <- liftIO $ toJSVal True
+    myDict <- liftIO $ JO.create >>= \o -> JO.setProp "audio" b o >> return o
 
+    mediaCallback <- liftIO $ newNavigatorUserMediaSuccessCallback $ \s -> do
+      case s of
+        Just stream -> do
+          Just src <- liftIO $ createMediaStreamSource c (Just stream)
+          liftIO $ connect (castToAudioNode src) (Just g) 0 0
+        Nothing -> liftIO (putStrLn "SUCCESS NOTHING")
 
-  fullCochlea <- cochlea c (castToAudioNode g)
-                         (CochleaConfig (100,5000) (updated filtsRange) 32 (updated nFilts) True never defBwFunc (updated bwFunc))
-
-  liftIO $ do
-    Just dest <- getDestination c
-    nm <- js_userAgent
-    when ("Chrome" `JS.isInfixOf` nm)  $ putStrLn "Chrome" >>
-      webkitGetUserMedia nav (Just $ Dictionary (jsval myDict)) (Just mediaCallback) (Just failureCallback)
-    when ("Firefox" `JS.isInfixOf` nm) $ putStrLn "FF" >> js_connectMic' c (castToAudioNode g)
-    putStrLn "Test2"
-  canvEl <- fmap (castToHTMLCanvasElement . _el_element . fst) $
-            elAttr' "canvas" ("id" =: "canvas"
-                           <> "width" =: "100"
-                           <> "height" =: "128"
-                           <> "style" =: "height:256px;") $ return ()
-  ctx'' <- liftIO $ GHCJS.DOM.HTMLCanvasElement.getContext
-           canvEl ("2d" :: JSString)
-  Just ctx' :: Maybe CanvasRenderingContext2D <- liftIO $ fromJSVal ctx''
-
-  el "br" $ return ()
-  performEvent (ffor pb $ \() -> liftIO $ do
-    draw ctx')
-
-  el "br" $ return ()
+    failureCallback <- liftIO $ newNavigatorUserMediaErrorCallback $ \e -> do
+      case e of
+        Just err -> liftIO $ print'' err
+        Nothing -> liftIO (putStrLn "FAILURE NOTHING")
 
 
-  t0 <- liftIO Data.Time.getCurrentTime
-  -- nskip <- mapDyn floor =<< numInput (NumInputConfig 1 120 120 False 0 4)
-  text "Sampling rate"
-  nskip <- dropdown 4 (constDyn $ fromList [(120, "1"),(60,"2"),(30,"4")
-                                           ,(15,"8"),(4,"30"),(2,"60"),(1,"120")])
-           def
-  ticks' <- tickLossy (1 / 120) t0
-  ticks <- downsample (current (value nskip)) ticks'
+    liftIO $ do
+      Just dest <- getDestination c
+      nm <- js_userAgent
+      when ("Chrome" `JS.isInfixOf` nm)  $ putStrLn "Chrome" >>
+        webkitGetUserMedia nav (Just $ Dictionary (jsval myDict))
+        (Just mediaCallback) (Just failureCallback)
+      when ("Firefox" `JS.isInfixOf` nm) $ putStrLn "FF" >> js_connectMic' c (castToAudioNode g)
+      putStrLn "Test2"
 
-  el "br" $ return ()
+    el "br" $ return ()
+    -- performEvent (ffor pb $ \() -> liftIO $ do
+    --                  draw ctx')
 
-  let defEq = UPrim2 PPow (UPrim2 PRange (UPrim1 PToDb UVar) (UPair (ULit (-90)) (ULit (-50)))) (ULit 2)
-      defStr = "(x dB -> (-90,-50))^2"
+    el "br" $ return ()
 
-  rInp <- textInput $ def & textInputConfig_initialValue .~ defStr
-  rFunc <- holdDyn defEq $ fmapMaybe (hush . parseUexp) (updated (value rInp))
-  gInp <- textInput $ def & textInputConfig_initialValue .~ defStr
-  gFunc <- holdDyn defEq $ fmapMaybe (hush. parseUexp) (updated (value gInp))
-  bInp <- textInput $ def & textInputConfig_initialValue .~ defStr
-  bFunc <- holdDyn defEq $ fmapMaybe (hush. parseUexp) (updated (value bInp))
 
-  cFuncs <- $(qDyn [| ( $(unqDyn [|rFunc|]), $(unqDyn [|gFunc|]), $(unqDyn [|bFunc|])) |])
+    t0 <- liftIO Data.Time.getCurrentTime
+    text "Sampling rate"
+    nskip <- dropdown 4 (constDyn $ fromList [(120, "1"),(60,"2"),(30,"4")
+                                             ,(15,"8"),(4,"30"),(2,"60"),(1,"120")])
+             def
+    ticks' <- tickLossy (1 / 120) t0
+    ticks <- downsample (current (value nskip)) ticks'
 
-  let applyExpr e xs = Prelude.map (flip uevalD e) xs
+    el "br" $ return ()
 
-  cochleaPowers <- _cochlea_getPowerData fullCochlea (() <$ ticks)
-  let cochleaColors = attachWith (\(fR,fG,fB) ps ->
-        let cs = elems ps
-            cR = applyExpr fR cs
-            cG = applyExpr fG cs
-            cB = applyExpr fB cs
-        in  (cR,cG,cB)) (current cFuncs) cochleaPowers
+    text "R"
+    rFunc <- funExprInput (UPrim2 PPow (UPrim2 PRange (UPrim1 PToDb UVar)
+                                        (UPair (ULit (-90)) (ULit (-50))))
+                           (ULit 4))
+             def
+    el "br" $ return ()
+    text "G"
+    gFunc <- funExprInput (UPrim2 PPow (UPrim2 PRange (UPrim1 PToDb UVar)
+                                        (UPair (ULit (-90)) (ULit (-50))))
+                           (ULit 4))
+             def
+    el "br" $ return ()
 
-  performEvent (ffor cochleaColors $ \(rs,gs,bs) -> liftIO $ do
+    text "B"
+    bFunc <- funExprInput (UPrim2 PPow (UPrim2 PRange (UPrim1 PToDb UVar)
+                                        (UPair (ULit (-90)) (ULit (-50))))
+                           (ULit 2))
+             def
+    el "br" $ return ()
+
+    cFuncs <- $(qDyn [| ( $(unqDyn [|rFunc|]), $(unqDyn [|gFunc|]), $(unqDyn [|bFunc|])) |])
+
+
+    return (fullCochlea, c, cFuncs, ticks)
+
+
+
+  elClass "div" "coch-display" $ do
+    canvEl <- fmap (castToHTMLCanvasElement . _el_element . fst) $
+              elAttr' "canvas" ("id" =: "canvas"
+                                <> "width" =: "200"
+                                <> "height" =: "128"
+                                <> "style" =: "height:256px;") $ return ()
+    ctx'' <- liftIO $ GHCJS.DOM.HTMLCanvasElement.getContext
+             canvEl ("2d" :: JSString)
+    Just ctx' :: Maybe CanvasRenderingContext2D <- liftIO $ fromJSVal ctx''
+
+
+    let applyExpr e xs = Prelude.map (flip uevalD e) xs
+
+    cochleaPowers <- _cochlea_getPowerData fullCochlea (() <$ ticks)
+    let cochleaColors = attachWith (\(fR,fG,fB) ps ->
+                                      let cs = elems ps
+                                          cR = applyExpr fR cs
+                                          cG = applyExpr fG cs
+                                          cB = applyExpr fB cs
+                                      in  (cR,cG,cB)) (current cFuncs) cochleaPowers
+
+    performEvent (ffor cochleaColors $ \(rs,gs,bs) -> liftIO $ do
                     when (length rs > 0) $ do
                       let toClamped :: [Double] -> IO Uint8ClampedArray
                           toClamped xs = (js_makeUint8ClampedArray . JA.fromList) =<< traverse (toJSVal . (* 255)) xs
                       r <- toClamped rs
                       g <- toClamped gs
                       b <- toClamped bs
-                      -- img :: Uint8ClampedArray <- js_zip_colors r g b
                       img <- js_zip_colors_magic_height r g b
-                      -- l <- js_lengthUint8ClampedArray' img
                       let l = 128 * 4 :: Int -- length rs * 4
                       imgData <- newImageData (Just img) 1 (fromIntegral $ l `div` 4)
                       shiftAppendColumn ctx'
-                      putImageData ctx' (Just imgData) 99 0)
+                      putImageData ctx' (Just imgData) 199 0)
 
-  el "br" $ return ()
+    el "br" $ return ()
 
 
 -- map double to 0-255 range
@@ -248,13 +280,13 @@ draw ctx = do
 
 shiftAppendColumn :: CanvasRenderingContext2D -> IO ()
 shiftAppendColumn ctx = do
-  Just d <- getImageData ctx 1 0 100 128
+  Just d <- getImageData ctx 1 0 200 128
   putImageData ctx (Just d) 0 0
 
 squeezeAppendColumn :: CanvasRenderingContext2D -> HTMLCanvasElement -> IO ()
 squeezeAppendColumn ctx canv = do
   save ctx
-  scale ctx (99/100) 1
+  scale ctx (199/200) 1
   drawImageFromCanvas ctx (Just canv) 0 0
   restore ctx
 

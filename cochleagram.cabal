@@ -30,6 +30,7 @@ library
                        ghcjs-base >= 0.2 && < 0.3,
                        ghcjs-dom >= 0.2 && < 0.3,
                        parsec,
+                       pretty,
                        reflex,
                        reflex-dom,
                        time,
@@ -41,6 +42,7 @@ executable cochleagram
   main-is: Main.hs
   hs-source-dirs: exec
   default-language: Haskell2010
+  ghcjs-options: -DGHCJS_BROWSER
   build-depends:    base,
                     arb-fft,
                     containers,
@@ -48,6 +50,7 @@ executable cochleagram
                     data-default,
                     ghcjs-base,
                     ghcjs-dom,
+                    pretty,
                     reflex,
                     reflex-dom,
                     time,

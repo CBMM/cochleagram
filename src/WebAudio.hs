@@ -70,6 +70,7 @@ gain :: MonadWidget t m
 gain ctx cfg = do
   Just g <- createGain ctx
   Just p <- getGain g
+  liftIO $ setValue p (realToFrac (_gainConfig_initialGain cfg))
   performEvent_ (ffor (_gainConfig_setGain cfg)$ \f ->
                   liftIO (setValue p (realToFrac f)))
   return g

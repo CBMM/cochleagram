@@ -2,9 +2,10 @@
 
 module Arithmetic where
 
-import Control.Applicative hiding ((<|>))
+import Control.Applicative hiding ((<|>), (<*>))
 import Data.Bifunctor
 import Data.Functor
+import Data.Monoid ((<>))
 import Debug.Trace
 import Text.Parsec
 import Text.Parsec.Language
@@ -13,11 +14,43 @@ import Text.Parsec.String
 import Text.Parsec.Token   hiding (parens)
 -- import Text.Attoparsec
 
+import Text.PrettyPrint ((<+>))
+import qualified Text.PrettyPrint as Pretty
+
+
+class Pretty p where
+  ppr :: Int -> p -> Pretty.Doc
+
+  {-# INLINE pp #-}
+  pp :: p -> Pretty.Doc
+  pp = ppr 0
+
+  {-# INLINE ppg #-}
+  ppg :: p -> String
+  ppg = Pretty.render . pp
+
+
 data Prim2 = PSum | PDiff | PProd | PDiv | PRange | PPow
   deriving (Eq, Show)
 
+instance Pretty Prim2 where
+  ppr _ PSum = Pretty.char '+'
+  ppr _ PDiff = Pretty.char '-'
+  ppr _ PProd = Pretty.char '*'
+  ppr _ PDiv = Pretty.char '/'
+  ppr _ PRange = Pretty.text "->"
+  ppr _ PPow = Pretty.char '^'
+
 data Prim1 = PNegate | PExpE | PExp10 | PLogE | PLog10 | PToDb
   deriving (Eq, Show)
+
+instance Pretty Prim1 where
+  ppr _ PNegate = Pretty.char '-'
+  ppr _ PExpE = Pretty.text "exp"
+  ppr _ PExp10 = Pretty.text "exp10"
+  ppr _ PLogE = Pretty.text "log"
+  ppr _ PLog10 = Pretty.text "log10"
+  ppr _ PToDb = Pretty.text "dB"
 
 evalPrim2 :: Prim2 -> UVal -> UVal -> UVal
 evalPrim2 PSum (VLit x) (VLit y) = VLit $ (+) x y
@@ -42,6 +75,14 @@ data UExp = ULit Double
           | UPrim1 Prim1 UExp
           | UPair  UExp  UExp
   deriving (Eq, Show)
+
+instance Pretty UExp where
+  ppr _ (ULit x) = Pretty.double x
+  ppr _ UVar   = Pretty.char 'x'
+  ppr _ (UPrim2 p a b) = Pretty.hsep [pp a, pp p, pp b]
+  ppr _ (UPrim1 PToDb a) = pp a <+> pp PToDb
+  ppr _ (UPrim1 p a) = pp p <+> pp a
+  ppr _ (UPair a b) = Pretty.parens ((pp a <> Pretty.comma) <+> pp b)
 
 ueval :: Double -> UExp -> UVal
 ueval _ (ULit a) = VLit a
