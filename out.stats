@@ -1,7 +1,7 @@
 code size summary per package:
 
-base:                    606602
-cochl_67Qx6p7CtPAHDQVStZlTo7:153098
+base:                    605843
+cochl_3nwZwGQRKByAGBtaaYOH6w:148500
 conta_5w3UY4chXx62LVUOUrXeRm:164664
 deeps_IA8DgGbqfWcHYE0vChdRyn:615
 depen_3ZazWrAF611CC0pGA27xUj:2889
@@ -11,11 +11,12 @@ ghc-prim:                24669
 ghcjs_B7KLFJ07Vte3zPHAgRIBTb:10933
 ghcjs_D7BYGeMTlMGF2My8KZzKUS:187802
 ghcjs_Kc7TQ2cEDg1F5e5cgY2Vuk:14738
-integer-gmp:             43525
-main:                    244106
+integer-gmp:             43737
+main:                    269386
 parse_2IIEIBfTu54BzyNlmha4Z7:529881
-refle_7EFZfl0m4Fe8Nfy5veIevU:481154
-refle_HxIfaa8jgl1Efs0BJoROZl:489521
+prett_7fhh973FxfDIAV4yIljzub:46490
+refle_7EFZfl0m4Fe8Nfy5veIevU:487153
+refle_HxIfaa8jgl1Efs0BJoROZl:489891
 reftf_JOU40Nd0lxyACBtr3v80Qj:1202
 safe_BjI3SxrMPD5F5AZ3gJB9mt:4752
 text_1ffW5NTi2SPHBcBuYSkgjk:3756
@@ -27,16 +28,16 @@ trans_KzbnBSIEqPI2eU1Inn4mzm:26770
 code size per module:
 
 base
-    Control.Concurrent.Chan:            3533
-    Control.Exception.Base:             7309
-    Control.Monad.Fix:                  584
-    Data.Char:                          1284
+    Control.Concurrent.Chan:            3575
+    Control.Exception.Base:             7357
+    Control.Monad.Fix:                  588
+    Data.Char:                          1288
     Data.Either:                        397
-    Data.Fixed:                         3009
-    Data.Functor.Identity:              1107
-    Data.Maybe:                         1186
-    Data.OldList:                       10282
-    Data.Tuple:                         167
+    Data.Fixed:                         2054
+    Data.Functor.Identity:              1111
+    Data.Maybe:                         1196
+    Data.OldList:                       10363
+    Data.Tuple:                         334
     Data.Type.Equality:                 287
     Data.Typeable:                      885
     Data.Typeable.Internal:             1418
@@ -49,7 +50,7 @@ base
     GHC.Char:                           718
     GHC.Conc.Sync:                      7822
     GHC.Enum:                           19566
-    GHC.Err:                            382
+    GHC.Err:                            218
     GHC.Exception:                      9546
     GHC.Float:                          74490
     GHC.Float.RealFracMethods:          300
@@ -93,10 +94,10 @@ base
     Text.Read:                          1321
     Text.Read.Lex:                      82904
 
-cochl_67Qx6p7CtPAHDQVStZlTo7
-    Arithmetic:                         67469
+cochl_3nwZwGQRKByAGBtaaYOH6w
+    Arithmetic:                         79781
     Cochlea:                            61467
-    WebAudio:                           24162
+    WebAudio:                           7252
 
 conta_5w3UY4chXx62LVUOUrXeRm
     Data.IntMap.Base:                   11330
@@ -157,10 +158,10 @@ ghcjs_Kc7TQ2cEDg1F5e5cgY2Vuk
 
 integer-gmp
     GHC.Integer.GMP.Prim:               333
-    GHC.Integer.Type:                   43192
+    GHC.Integer.Type:                   43404
 
 main
-    Main:                               244106
+    Main:                               269386
 
 parse_2IIEIBfTu54BzyNlmha4Z7
     Text.Parsec.Char:                   21390
@@ -172,9 +173,13 @@ parse_2IIEIBfTu54BzyNlmha4Z7
     Text.Parsec.Prim:                   27705
     Text.Parsec.Token:                  358824
 
+prett_7fhh973FxfDIAV4yIljzub
+    Text.PrettyPrint.Annotated.HughesPJ:45486
+    Text.PrettyPrint.HughesPJ:          1004
+
 refle_7EFZfl0m4Fe8Nfy5veIevU
     Data.Functor.Misc:                  8785
-    Reflex.Class:                       26279
+    Reflex.Class:                       32278
     Reflex.Dynamic:                     80066
     Reflex.Host.Class:                  1986
     Reflex.Spider.Internal:             364038
@@ -184,7 +189,7 @@ refle_HxIfaa8jgl1Efs0BJoROZl
     Reflex.Dom.Internal:                55471
     Reflex.Dom.Time:                    9526
     Reflex.Dom.Widget.Basic:            352924
-    Reflex.Dom.Widget.Input:            38675
+    Reflex.Dom.Widget.Input:            39045
 
 reftf_JOU40Nd0lxyACBtr3v80Qj
     Control.Monad.Ref:                  1202
@@ -215,5 +220,5 @@ trans_KzbnBSIEqPI2eU1Inn4mzm
 
 
 
-packed metadata: 544397
+packed metadata: 562752
 

@@ -1,0 +1,15 @@
+.expr-good {
+    box-shadow: 0px 0px 5px hsla(100,50%,50%,1);
+}
+
+body {
+  display: flex;
+}
+
+.controls {
+  padding: 20px;
+}
+
+.coch-display {
+  background-color: rgba(0,0,0,1);
+}
