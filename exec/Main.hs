@@ -99,34 +99,34 @@ main' = do
   pb <- getPostBuild
 
   let gain0 = 2
-  -- numInput (NumInputConfig 1 1000 7 True 0 10)
   el "br" $ return ()
   text "Mic Gain"
   gainCoef <- numInput (NumInputConfig 0.01 10 33 True 2 gain0)
   el "br" $ return ()
 
-  nFilts :: Dynamic t Int <- mapDyn floor =<< numInput (NumInputConfig 1 128 15 True 0 32)
+  text "Freq 1"
+  filtsLo  <- numInput (NumInputConfig 0.1 1000 300 True 2 100)
+  el "br" $ return ()
+
+  text "Freq n"
+  filtsHi <- numInput (NumInputConfig 0.1 10000 300 True 2 5000)
+  el "br" $ return ()
+
+  text "N Filts"
+  nFilts  <- mapDyn floor =<< numInput (NumInputConfig 1 128 15 True 0 32)
+  el "br" $ return ()
+
+  filtsRange <- combineDyn (,) filtsLo filtsHi
+
   text "Bandwidth Function"
-  bwInput <- textInput $ def (textInputConfig_initialValue .~ "x / 100")
+  bwInput <- textInput $
+             def & textInputConfig_initialValue .~ "x / 100"
+                 & textInputConfig_attributes   .~ constDyn ("placeholder" =: "x / 100")
   let defBwFunc = (UPrim2 PDiv UVar (ULit 100.0))
   bwFunc <- holdDyn (UPrim2 PDiv UVar (ULit 100.0)) $
             fmapMaybe (hush . parseUexp) (updated (value bwInput))
 
-  fInput <- textInput $ def & textInputConfig_inputType .~ "range"
-                            & attributes .~ constDyn (   "min"  =: "500"
-                                                      <> "max"  =: "2000"
-                                                      <> "step" =: "0.01")
-  el "br" $ return ()
-  gInput <- textInput $ def & textInputConfig_inputType .~ "range"
-                            & attributes .~ constDyn (   "min"  =: "0.1"
-                                                      <> "max"  =: "5"
-                                                      <> "step" =: "0.01"
-                                                      <> "value" =: "0.01")
-  el "br" $ return ()
 
-
-  let freqs = fmap ((\(x :: Int) -> (x, show x)) . floor . ((2 :: Double) ^^)) [(5 :: Int) ..11] :: [(Int,String)]
-  fftLen <- dropdown 2048 (constDyn (Data.Map.fromList freqs)) def
   el "br" $ return ()
 
   c <- liftIO newAudioContext
@@ -151,21 +151,12 @@ main' = do
       Just err -> liftIO $ print'' err
       Nothing -> liftIO (putStrLn "FAILURE NOTHING")
 
-  analyser <- analyserNode c def { _analyserNodeConfig_initial_smoothingTimeConstant = 0
-                                 , _analyserNodeConfig_change_fftSize = updated (value fftLen)}
 
-  -- TODO
   fullCochlea <- cochlea c (castToAudioNode g)
-                         (CochleaConfig (100,5000) never 32 (updated nFilts) True never defBwFunc (updated bwFunc))
+                         (CochleaConfig (100,5000) (updated filtsRange) 32 (updated nFilts) True never defBwFunc (updated bwFunc))
 
   liftIO $ do
-    --connect mic (Just g) 0 0
-    -- connect osc (Just g) 0 0
     Just dest <- getDestination c
-    -- connect g (Just dest) 0 0
-    --connect (castToAudioNode $ _cfConvolverNode cFilt) (Just dest) 0 0
-    connect g (Just (_analyser_node analyser)) 0 0
-    -- start osc 0
     nm <- js_userAgent
     when ("Chrome" `JS.isInfixOf` nm)  $ putStrLn "Chrome" >>
       webkitGetUserMedia nav (Just $ Dictionary (jsval myDict)) (Just mediaCallback) (Just failureCallback)
@@ -188,7 +179,15 @@ main' = do
 
 
   t0 <- liftIO Data.Time.getCurrentTime
-  ticks <- tickLossy 0.033 t0
+  -- nskip <- mapDyn floor =<< numInput (NumInputConfig 1 120 120 False 0 4)
+  text "Sampling rate"
+  nskip <- dropdown 4 (constDyn $ fromList [(120, "1"),(60,"2"),(30,"4")
+                                           ,(15,"8"),(4,"30"),(2,"60"),(1,"120")])
+           def
+  ticks' <- tickLossy (1 / 120) t0
+  ticks <- downsample (current (value nskip)) ticks'
+
+  el "br" $ return ()
 
   let defEq = UPrim2 PPow (UPrim2 PRange (UPrim1 PToDb UVar) (UPair (ULit (-90)) (ULit (-50)))) (ULit 2)
       defStr = "(x dB -> (-90,-50))^2"
@@ -219,36 +218,16 @@ main' = do
                       r <- toClamped rs
                       g <- toClamped gs
                       b <- toClamped bs
-                      img :: Uint8ClampedArray <- js_zip_colors r g b
+                      -- img :: Uint8ClampedArray <- js_zip_colors r g b
+                      img <- js_zip_colors_magic_height r g b
                       -- l <- js_lengthUint8ClampedArray' img
-                      let l = length rs * 4
+                      let l = 128 * 4 :: Int -- length rs * 4
                       imgData <- newImageData (Just img) 1 (fromIntegral $ l `div` 4)
                       shiftAppendColumn ctx'
                       putImageData ctx' (Just imgData) 99 0)
 
   el "br" $ return ()
 
-
-  -- ticks60 <- tickLossy 0.015 t0
-  -- lightLevels <- foldDyn
-  --                (\l0 l -> unionWith (\a b -> max (a*0.99) b) l0 l)
-  --                mempty
-  --                cochleaPowers
-  -- -- _ <- el "div" $ do
-  -- listViewWithKey' lightLevels $ \k v -> do
-  --     let boxColor l = "rgba("
-  --                   <> show (dblToInt (-90) (-30) (20 * logBase 10 l))
-  --                   <> ",0,0,1)"
-  --     boxAttrs <- forDyn v $ \light ->
-  --       "style" =: ("float:left;height:20px;width:20px;background-color:" <> boxColor light)
-  --                                   -- <> "hight" =: "20px"
-  --                                   -- <> "width" =: "20px"
-  --                                   -- <> "style" =: boxColor light
-  --     -- boxLabel <- mapDyn (show . boxColor) v
-  --     (thisBox :: El t, _) <- elDynAttr' "div" boxAttrs $
-  --       return () -- (dynText boxLabel)
-  --     return (domEvent Click thisBox :: Reflex.Dom.Event t ())
-  -- return ()
 
 -- map double to 0-255 range
 dblToInt :: Double -> Double -> Double -> Int
@@ -290,6 +269,11 @@ foreign import javascript unsafe
  "$r = new Uint8ClampedArray(($1).length * 4); var l = ($1).length; for (var i = 0; i < l; i++) { var i0 = (l - i - 1) * 4; ($r)[i0] = ($1)[i]; ($r)[i0+1] = ($2)[i]; ($r)[i0+2] = ($3)[i]; ($r)[i0+3] = 255;}"
    js_zip_colors :: Uint8ClampedArray -> Uint8ClampedArray -> Uint8ClampedArray -> IO Uint8ClampedArray
 
+foreign import javascript unsafe
+ "var out_l = 128; var in_l = ($1).length; $r = new Uint8ClampedArray(out_l * 4);  for (var i = 0; i < out_l; i++) { var in_i = (i * in_l / out_l) | 0; var i0 = (out_l - i - 1) * 4; ($r)[i0] = ($1)[in_i]; ($r)[i0+1] = ($2)[in_i]; ($r)[i0+2] = ($3)[in_i]; ($r)[i0+3] = 255;}"
+   js_zip_colors_magic_height :: Uint8ClampedArray -> Uint8ClampedArray -> Uint8ClampedArray -> IO Uint8ClampedArray
+
+
 foreign import javascript unsafe "console.log(($1).data[0])"
   print' :: ImageData -> IO ()
 
@@ -310,3 +294,13 @@ foreign import javascript unsafe "navigator.mediaDevices.getUserMedia({'audio':t
 
 foreign import javascript unsafe "if (window.location.protocol != 'https:') { window.location.href = 'https:' + window.location.href.substring(window.location.protocol.length) }"
   js_forceHttps :: IO ()
+
+downsample :: forall t m a. MonadWidget t m => Behavior t Int -> Event t a -> m (Event t a)
+downsample nDropPerKeep e = do
+  counted :: Event t (Int, a) <- zipListWithEvent (,) [0 :: Int ..] e
+  let f :: Int -> (Int, a) -> Maybe a
+      f n (ind, ev)
+        | ind `mod` n == 0 = Just ev
+        | otherwise        = Nothing
+      kept    = attachWithMaybe f nDropPerKeep counted
+  return kept
