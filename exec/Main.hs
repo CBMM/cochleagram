@@ -52,46 +52,21 @@ import Reflex
 import Text.Read (readMaybe)
 import Reflex.Dom hiding (setValue, restore)
 import Reflex.Dom.Time
+import Reflex.Dom.Contrib.Widgets.Common
+import Reflex.Dom.Contrib.Widgets.ButtonGroup
 import Arithmetic
 import Cochlea
 import WebAudio
 import Data.Map
 
-data NumInputConfig = NumInputConfig {
-   numInputConfig_min          :: Double
-  ,numInputConfig_max          :: Double
-  ,numInputConfig_n            :: Int
-  ,numInputConfig_log          :: Bool
-  ,numInputConfig_sigfigs      :: Int
-  ,numInputConfig_initialValue :: Double
-  }
-
-numInput :: (MonadWidget t m)
-         => NumInputConfig
-         -> m (Dynamic t Double)
-numInput (NumInputConfig lo hi n isLog sigfigs x0) =
-  elClass "div" "num-input" $ do
-    let (rMin,rMax) = bool (lo, hi) (log lo, log hi) isLog
-        rStep       = (rMax - rMin) / (fromIntegral n - 1)
-        rVal        = bool x0 (log x0) isLog
-        mkRound     :: Double -> Double
-        mkRound     = (/ 10 ^^ sigfigs)
-                      . (fromIntegral :: Int -> Double)
-                      . round
-                      . (* 10 ^^ sigfigs)
-    nInput <- textInput $
-      def & textInputConfig_inputType  .~ "range"
-          & textInputConfig_attributes .~ constDyn
-            ( "min"   =: show rMin
-           <> "max"   =: show rMax
-           <> "step"  =: show rStep
-           <> "value" =: show rVal)
-    valNum <- holdDyn x0 $ fmap mkRound
-                         $ fmap (bool id exp isLog)
-                         $ fmapMaybe readMaybe
-                         $ (updated $ value nInput)
-    dynText =<< mapDyn show valNum
-    return valNum
+justButtonGroup :: (MonadWidget t m, Eq a, Show a)
+                => a
+                -> Dynamic t [(a,String)]
+                -> WidgetConfig t (Maybe a)
+                -> m (Dynamic t a)
+justButtonGroup vDef btns cfg = do
+  bg <- bootstrapButtonGroup btns cfg {_widgetConfig_initialValue = Just vDef}
+  holdDyn vDef (fmapMaybe id $ updated (value bg))
 
 funExprInput :: MonadWidget t m => UExp -> TextInputConfig t -> m (Dynamic t UExp)
 funExprInput exp0 inConfig = mdo
@@ -113,23 +88,36 @@ main' :: forall t m. MonadWidget t m => m ()
 main' = do
   pb <- getPostBuild
 
-  (fullCochlea, c, cFuncs, ticks) <- elClass "div" "controls" $ do
+  (fullCochlea, c, cFuncs, ticks) <- elClass "div" "controls" $ mdo
     let gain0 = 8
     el "br" $ return ()
-    text "Mic Gain"
-    gainCoef <- numInput (NumInputConfig 0.01 10 33 True 2 gain0)
+    text "Mic Boost"
+    gainCoef <- justButtonGroup 4
+                (constDyn [(1,"1x") ,(2,"2x"),(4,"4x"),(8,"8x")])
+                def
     el "br" $ return ()
 
     text "Freq 1"
-    filtsLo  <- numInput (NumInputConfig 0.1 1000 300 True 2 100)
+    filtsLo <- justButtonGroup 100
+               (constDyn [(50,"50 Hz"),(100,"100 Hz"),(200,"200 Hz"), (400,"400 Hz")])
+               def
+    --filtsLo  <- numInput (NumInputConfig 0.1 1000 300 True 2 100)
     el "br" $ return ()
 
     text "Freq n"
-    filtsHi <- numInput (NumInputConfig 0.1 10000 300 True 2 5000)
+    filtsHi <- justButtonGroup 3200
+               (constDyn [(800,"800"), (1600, "1600"), (3200, "3200")
+                         , (6400, "6400"), (12800, "12800")])
+               def
+    --filtsHi <- numInput (NumInputConfig 0.1 10000 300 True 2 5000)
     el "br" $ return ()
 
     text "N Filts"
-    nFilts  <- mapDyn floor =<< numInput (NumInputConfig 1 128 15 True 0 64)
+    nFilts <- justButtonGroup 32
+              (constDyn [(8,"8"), (16,"16"), (32,"32")
+                        , (64,"64"), (128,"128")])
+              def
+    --nFilts  <- mapDyn floor =<< numInput (NumInputConfig 1 128 15 True 0 64)
     el "br" $ return ()
 
     filtsRange <- combineDyn (,) filtsLo filtsHi
@@ -181,19 +169,26 @@ main' = do
       putStrLn "Test2"
 
     el "br" $ return ()
-    -- performEvent (ffor pb $ \() -> liftIO $ do
-    --                  draw ctx')
-
-    el "br" $ return ()
-
 
     t0 <- liftIO Data.Time.getCurrentTime
     text "Sampling rate"
-    nskip <- dropdown 4 (constDyn $ fromList [(120, "1"),(60,"2"),(30,"4")
-                                             ,(15,"8"),(4,"30"),(2,"60"),(1,"120")])
+    nskip <- justButtonGroup 4
+             (constDyn $ [(120, "1") ,(15,"8"),(4,"30")
+                         ,(2,"60"),(1,"120")])
              def
+
+    -- nskip <- dropdown 15 (constDyn $ fromList [(120, "1"),(60,"2"),(30,"4")
+    --                                           ,(15,"8"),(4,"30"),(2,"60"),(1,"120")]) def
+
+    playBtnCfg <- forDyn (playing :: Dynamic t Bool) $ \b ->
+      bool ("class" =: "glyphicon glyphicon-play")
+           ("class" =: "glyphicon glyphicon-pause") b
+    playBtn <- fst <$> elDynAttr' "span" playBtnCfg (return ())
+    playing :: Dynamic t Bool <- toggle False (domEvent Click playBtn)
+
     ticks' <- tickLossy (1 / 120) t0
-    ticks <- downsample (current (value nskip)) ticks'
+    ticks'' <- downsample (current (nskip)) ticks'
+    let ticks = gate (current playing) ticks''
 
     el "br" $ return ()
 

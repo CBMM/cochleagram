@@ -5,3 +5,6 @@
 	path = dist/build/cochleagram/cochleagram.jsexe
 	url = git@github.com:imalsogreg/cochleagram.git
 	ignore = all
+[submodule "deps/reflex-dom-contrib"]
+	path = deps/reflex-dom-contrib
+	url = https://github.com/reflex-frp/reflex-dom-contrib

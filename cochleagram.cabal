@@ -33,6 +33,7 @@ library
                        pretty,
                        reflex,
                        reflex-dom,
+                       reflex-dom-contrib,
                        time,
                        transformers
   hs-source-dirs:      src
@@ -53,5 +54,6 @@ executable cochleagram
                     pretty,
                     reflex,
                     reflex-dom,
+                    reflex-dom-contrib,
                     time,
                     transformers
