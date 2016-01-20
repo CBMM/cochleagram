@@ -13,3 +13,7 @@ body {
 .coch-display {
   background-color: rgba(0,0,0,1);
 }
+
+.btn-group button {
+  font-size: 8pt;
+}
