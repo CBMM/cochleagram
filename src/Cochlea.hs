@@ -150,11 +150,7 @@ cochlea ctx inputNode (CochleaConfig rng drng n dn l dl f df) = do
   nfilts    <- holdDyn n   dn
   logspace  <- holdDyn l   dl
   bwFunc    <- holdDyn f   df
-  filtspecs <- $(qDyn [| freqSpace $(unqDyn [|frange|])
-                                   $(unqDyn [|nfilts|])
-                                   $(unqDyn [|logspace|])
-                                   $(unqDyn [|bwFunc|])
-                      |])
+  let filtspecs = freqSpace <$> frange <*> nfilts <*> logspace <*> bwFunc
   filts     <- listWithKey filtspecs $ \freq filt -> do
     cochlearFilter ctx inputNode
       CochlearFilterConfig { _cfcFilter = filt

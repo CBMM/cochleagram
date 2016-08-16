@@ -55,5 +55,6 @@ executable cochleagram
                     reflex,
                     reflex-dom,
                     reflex-dom-contrib,
+                    text,
                     time,
                     transformers

@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE JavaScriptFFI #-}
@@ -14,6 +15,7 @@ import Control.Monad (join, when)
 import Data.Bool (bool)
 import qualified Data.JSString as JS
 import Data.Maybe (isJust, fromJust)
+import qualified Data.Text as T
 import Data.Time (getCurrentTime)
 import Data.Monoid
 import GHCJS.Foreign
@@ -59,25 +61,40 @@ import Cochlea
 import WebAudio
 import Data.Map
 
-justButtonGroup :: (MonadWidget t m, Eq a, Ord a, Show a)
-                => a
-                -> Dynamic t [(a,String)]
-                -> ButtonGroupConfig t Int a
+justButtonGroup :: (MonadWidget t m, Eq a, Show a)
+                => T.Text 
+                -> a
+                -> Dynamic t [(a,T.Text)]
                 -> m (Dynamic t a)
-justButtonGroup vDef btns cfg = elAttr "div" ("class" =: "btn-group" <> "role" =: "group" <> "aria-label" =: "...") $ do
-  btns' <- forDyn btns $ \b -> fromList (zip [1..] (Prelude.map fst b))
-  bg <- bootstrapButtonGroup' btns' cfg {_buttonGroupConfig_initialValue = Just vDef}
-  holdDyn vDef (fmapMaybe id $ updated (value bg))
+justButtonGroup lbl v0 choices = el "tr" $ do
+        el "td" $ text lbl
+        wid <- el "td" $
+          bootstrapButtonGroup choices
+          WidgetConfig { _widgetConfig_setValue     = never
+                       , _widgetConfig_attributes   = constDyn ("class" =: "btn-group btn-group-xs")
+                       , _widgetConfig_initialValue = Just v0
+                       }
+        holdDyn v0 (fmapMaybe id $ _hwidget_change wid)
 
-bootstrapButtonGroup' :: forall t m a.(MonadWidget t m, Eq a, Ord a, Show a) => Dynamic t (Map Int a) -> ButtonGroupConfig t Int a -> m (ButtonGroup t Int a)
-bootstrapButtonGroup' btns cfg = do
-  let drawButton :: Maybe Int -> Dynamic t a -> Dynamic t Bool -> m (Event t (), El t)
-      drawButton _ v checked = do
-        txt <- mapDyn show v
-        btnAttrs <- forDyn checked $ \b -> "class" =: bool "btn btn-default" "btn btn-default active" b
-        b <- fst <$> elDynAttr' "button" btnAttrs (dynText txt)
-        return (domEvent Click b, b)
-  Reflex.Dom.buttonGroup drawButton btns cfg
+-- justButtonGroup :: (MonadWidget t m, Eq a, Ord a, Show a)
+--                => a
+--                -> Dynamic t [(a,String)]
+--                -> ButtonGroupConfig t Int a
+--                -> m (Dynamic t a)
+--justButtonGroup vDef btns cfg = elAttr "div" ("class" =: "btn-group" <> "role" =: "group" <> "aria-label" =: "...") $ do
+--  btns' <- forDyn btns $ \b -> fromList (zip [1..] (Prelude.map fst b))
+--  bg <- bootstrapButtonGroup' btns' cfg {_buttonGroupConfig_initialValue = Just vDef}
+--  holdDyn vDef (fmapMaybe id $ updated (value bg))
+
+--bootstrapButtonGroup' :: forall t m a.(MonadWidget t m, Eq a, Ord a, Show a) => Dynamic t (Map Int a) -> ButtonGroupConfig t Int a -> m (ButtonGroup t Int a)
+--bootstrapButtonGroup' btns cfg = do
+--  let drawButton :: Maybe Int -> Dynamic t a -> Dynamic t Bool -> m (Event t (), El t)
+--      drawButton _ v checked = do
+--        txt <- mapDyn show v
+--        btnAttrs <- forDyn checked $ \b -> "class" =: bool "btn btn-default" "btn btn-default active" b
+--        b <- fst <$> elDynAttr' "button" btnAttrs (dynText txt)
+--        return (domEvent Click b, b)
+--  Reflex.Dom.buttonGroup drawButton btns cfg
 
 funExprInput :: MonadWidget t m => UExp -> TextInputConfig t -> m (Dynamic t UExp)
 funExprInput exp0 inConfig = mdo
@@ -85,10 +102,10 @@ funExprInput exp0 inConfig = mdo
   boxAttrs <- combineDyn
          (\ats e ->  ats <> "class" =: bool "expr expr-bad" "expr expr-good" (isJust e))
          (_textInputConfig_attributes inConfig) textExpr
-  eInp     <- textInput def { _textInputConfig_initialValue = pExp0
+  eInp     <- textInput def { _textInputConfig_initialValue = T.pack pExp0
                             , _textInputConfig_attributes   = boxAttrs
                             }
-  textExpr <- mapDyn (hush . parseUexp) (value eInp)
+  textExpr <- mapDyn (hush . parseUexp) (fmap T.unpack $ value eInp)
   outExp   <- holdDyn exp0 $ fmapMaybe id (updated textExpr)
   return outExp
 
@@ -102,33 +119,32 @@ main' = do
   (fullCochlea, c, cFuncs, ticks) <- elClass "div" "controls" $ mdo
     let gain0 = 8
     el "br" $ return ()
-    text "Mic Boost"
-    gainCoef <- justButtonGroup 4
+    -- text "Mic Boost"
+    gainCoef <- justButtonGroup "Mic Boost" 4
                 (constDyn [(1 :: Double,"1") ,(2,"2"),(4,"4"),(8,"8")])
-                def
+                
     -- gainCoef <- mapDyn (fromIntegral . fromJust) $ value gainBtns
     -- let gainCoef = constDyn 10
     el "br" $ return ()
 
-    text "Freq 1"
-    filtsLo <- justButtonGroup 100
+    -- text "Freq 1"
+    filtsLo <- justButtonGroup "Freq0" 100
                (constDyn [(50,"50 Hz"),(100,"100 Hz"),(200,"200 Hz"), (400,"400 Hz")])
-               def
+               
     el "br" $ return ()
 
-    text "Freq n"
-    filtsHi <- justButtonGroup 3200
+    -- text "Freq n"
+    filtsHi <- justButtonGroup "FreqN" 3200
                (constDyn [(800,"800"), (1600, "1600"), (3200, "3200")
                          , (6400, "6400"), (12800, "12800")])
-               def
     --filtsHi <- numInput (NumInputConfig 0.1 10000 300 True 2 5000)
     el "br" $ return ()
 
-    text "N Filts"
-    nFilts <- justButtonGroup 32
+    -- text "N Filts"
+    nFilts <- justButtonGroup "Filts N" 32
               (constDyn [(8,"8"), (16,"16"), (32,"32")
                         , (64,"64"), (128,"128")])
-              def
+              
     --nFilts  <- mapDyn floor =<< numInput (NumInputConfig 1 128 15 True 0 64)
     el "br" $ return ()
 
@@ -183,11 +199,10 @@ main' = do
     el "br" $ return ()
 
     t0 <- liftIO Data.Time.getCurrentTime
-    text "Sampling rate"
-    nskip <- justButtonGroup 4
+    -- text "Sampling rate"
+    nskip <- justButtonGroup "Sampling Rate" 4
              (constDyn $ [(120, "1") ,(15,"8"),(4,"30")
                          ,(2,"60"),(1,"120")])
-             def
 
     -- nskip <- dropdown 15 (constDyn $ fromList [(120, "1"),(60,"2"),(30,"4")
     --                                           ,(15,"8"),(4,"30"),(2,"60"),(1,"120")]) def
@@ -224,7 +239,7 @@ main' = do
              def
     el "br" $ return ()
 
-    cFuncs <- $(qDyn [| ( $(unqDyn [|rFunc|]), $(unqDyn [|gFunc|]), $(unqDyn [|bFunc|])) |])
+    let cFuncs = (,,) <$> rFunc <*> gFunc <*> bFunc -- $(qDyn [| ( $(unqDyn [|rFunc|]), $(unqDyn [|gFunc|]), $(unqDyn [|bFunc|])) |])
 
 
     return (fullCochlea, c, cFuncs, ticks)
