@@ -13,7 +13,7 @@ import Control.Applicative (liftA3)
 import Control.Monad (join, when)
 import Data.Bool (bool)
 import qualified Data.JSString as JS
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, fromJust)
 import Data.Time (getCurrentTime)
 import Data.Monoid
 import GHCJS.Foreign
@@ -59,14 +59,25 @@ import Cochlea
 import WebAudio
 import Data.Map
 
-justButtonGroup :: (MonadWidget t m, Eq a, Show a)
+justButtonGroup :: (MonadWidget t m, Eq a, Ord a, Show a)
                 => a
                 -> Dynamic t [(a,String)]
-                -> WidgetConfig t (Maybe a)
+                -> ButtonGroupConfig t Int a
                 -> m (Dynamic t a)
-justButtonGroup vDef btns cfg = do
-  bg <- bootstrapButtonGroup btns cfg {_widgetConfig_initialValue = Just vDef}
+justButtonGroup vDef btns cfg = elAttr "div" ("class" =: "btn-group" <> "role" =: "group" <> "aria-label" =: "...") $ do
+  btns' <- forDyn btns $ \b -> fromList (zip [1..] (Prelude.map fst b))
+  bg <- bootstrapButtonGroup' btns' cfg {_buttonGroupConfig_initialValue = Just vDef}
   holdDyn vDef (fmapMaybe id $ updated (value bg))
+
+bootstrapButtonGroup' :: forall t m a.(MonadWidget t m, Eq a, Ord a, Show a) => Dynamic t (Map Int a) -> ButtonGroupConfig t Int a -> m (ButtonGroup t Int a)
+bootstrapButtonGroup' btns cfg = do
+  let drawButton :: Maybe Int -> Dynamic t a -> Dynamic t Bool -> m (Event t (), El t)
+      drawButton _ v checked = do
+        txt <- mapDyn show v
+        btnAttrs <- forDyn checked $ \b -> "class" =: bool "btn btn-default" "btn btn-default active" b
+        b <- fst <$> elDynAttr' "button" btnAttrs (dynText txt)
+        return (domEvent Click b, b)
+  Reflex.Dom.buttonGroup drawButton btns cfg
 
 funExprInput :: MonadWidget t m => UExp -> TextInputConfig t -> m (Dynamic t UExp)
 funExprInput exp0 inConfig = mdo
@@ -93,15 +104,16 @@ main' = do
     el "br" $ return ()
     text "Mic Boost"
     gainCoef <- justButtonGroup 4
-                (constDyn [(1,"1x") ,(2,"2x"),(4,"4x"),(8,"8x")])
+                (constDyn [(1 :: Double,"1") ,(2,"2"),(4,"4"),(8,"8")])
                 def
+    -- gainCoef <- mapDyn (fromIntegral . fromJust) $ value gainBtns
+    -- let gainCoef = constDyn 10
     el "br" $ return ()
 
     text "Freq 1"
     filtsLo <- justButtonGroup 100
                (constDyn [(50,"50 Hz"),(100,"100 Hz"),(200,"200 Hz"), (400,"400 Hz")])
                def
-    --filtsLo  <- numInput (NumInputConfig 0.1 1000 300 True 2 100)
     el "br" $ return ()
 
     text "Freq n"
