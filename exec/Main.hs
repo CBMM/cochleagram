@@ -116,46 +116,51 @@ main' :: forall t m. MonadWidget t m => m ()
 main' = do
   pb <- getPostBuild
 
-  (fullCochlea, c, cFuncs, ticks) <- elClass "div" "controls" $ mdo
+  (fullCochlea, c, cFuncs, ticks) <- elClass "div" "page" $ mdo
     let gain0 = 8
     el "br" $ return ()
-    -- text "Mic Boost"
-    gainCoef <- justButtonGroup "Mic Boost" 4
-                (constDyn [(1 :: Double,"1") ,(2,"2"),(4,"4"),(8,"8")])
-                
-    -- gainCoef <- mapDyn (fromIntegral . fromJust) $ value gainBtns
-    -- let gainCoef = constDyn 10
-    el "br" $ return ()
 
-    -- text "Freq 1"
-    filtsLo <- justButtonGroup "Freq0" 100
-               (constDyn [(50,"50 Hz"),(100,"100 Hz"),(200,"200 Hz"), (400,"400 Hz")])
-               
-    el "br" $ return ()
-
-    -- text "Freq n"
-    filtsHi <- justButtonGroup "FreqN" 3200
-               (constDyn [(800,"800"), (1600, "1600"), (3200, "3200")
-                         , (6400, "6400"), (12800, "12800")])
-    --filtsHi <- numInput (NumInputConfig 0.1 10000 300 True 2 5000)
-    el "br" $ return ()
-
-    -- text "N Filts"
-    nFilts <- justButtonGroup "Filts N" 32
-              (constDyn [(8,"8"), (16,"16"), (32,"32")
-                        , (64,"64"), (128,"128")])
-              
-    --nFilts  <- mapDyn floor =<< numInput (NumInputConfig 1 128 15 True 0 64)
-    el "br" $ return ()
-
-    filtsRange <- combineDyn (,) filtsLo filtsHi
-
-    text "Bandwidth Function"
     let defBwFunc = (UPrim2 PDiv UVar (ULit 100))
-    bwFunc <- funExprInput defBwFunc def
+    (gainCoef, filtsLo, filtsHi, filtsRange, nFilts, bwFunc, nskip, playing) <- elClass "div" "controls" $ el "table" $ mdo
+
+      gainCoef <- justButtonGroup "Mic Boost" 4
+                  (constDyn [(1 :: Double,"1") ,(2,"2"),(4,"4"),(8,"8")])
+                
+      filtsLo <- justButtonGroup "Freq0" 100
+                 (constDyn [(50,"50 Hz"),(100,"100 Hz"),(200,"200 Hz"), (400,"400 Hz")])
+               
+
+      filtsHi <- justButtonGroup "FreqN" 3200
+                 (constDyn [(800,"800"), (1600, "1600"), (3200, "3200")
+                           , (6400, "6400"), (12800, "12800")])
+
+      nFilts <- justButtonGroup "Filts N" 32
+                (constDyn [(8,"8"), (16,"16"), (32,"32")
+                          , (64,"64"), (128,"128")])
+
+      nskip <- justButtonGroup "Sampling Rate" 4
+             (constDyn $ [(120, "1") ,(15,"8"),(4,"30")
+                         ,(2,"60"),(1,"120")])
 
 
-    el "br" $ return ()
+      filtsRange <- combineDyn (,) filtsLo filtsHi
+
+      bwFunc <- el "tr" $ do
+        el "td" $ text "Bandwidth Fn"
+        el "td" $ funExprInput defBwFunc def
+
+
+      playing :: Dynamic t Bool <- toggle False (domEvent Click playBtn)
+      playBtnCfg <- forDyn (playing :: Dynamic t Bool) $ \b ->
+        bool ("class" =: "glyphicon glyphicon-play")
+             ("class" =: "glyphicon glyphicon-pause") b
+      let btnText = fmap (bool "Paused " "Playing ") playing
+      playBtn <- fmap fst $ do
+        dynText btnText
+        elDynAttr' "span" playBtnCfg (return ())
+
+      return (gainCoef, filtsLo, filtsHi, filtsRange, nFilts, bwFunc, nskip, playing)
+
 
     c <- liftIO newAudioContext
 
@@ -166,8 +171,6 @@ main' = do
                     64 (updated nFilts)
                     True never
                     defBwFunc (updated bwFunc))
-
-    -- osc <- oscillatorNode c (OscillatorNodeConfig 440 freq)
 
     Just win <- liftIO currentWindow
     Just nav <- liftIO $ getNavigator win
@@ -200,46 +203,36 @@ main' = do
 
     t0 <- liftIO Data.Time.getCurrentTime
     -- text "Sampling rate"
-    nskip <- justButtonGroup "Sampling Rate" 4
-             (constDyn $ [(120, "1") ,(15,"8"),(4,"30")
-                         ,(2,"60"),(1,"120")])
-
-    -- nskip <- dropdown 15 (constDyn $ fromList [(120, "1"),(60,"2"),(30,"4")
-    --                                           ,(15,"8"),(4,"30"),(2,"60"),(1,"120")]) def
-
-    playBtnCfg <- forDyn (playing :: Dynamic t Bool) $ \b ->
-      bool ("class" =: "glyphicon glyphicon-play")
-           ("class" =: "glyphicon glyphicon-pause") b
-    playBtn <- fst <$> elDynAttr' "span" playBtnCfg (return ())
-    playing :: Dynamic t Bool <- toggle False (domEvent Click playBtn)
+    
 
     ticks' <- tickLossy (1 / 120) t0
     ticks'' <- downsample (current (nskip)) ticks'
     let ticks = gate (current playing) ticks''
 
-    el "br" $ return ()
 
-    text "R"
-    rFunc <- funExprInput (UPrim2 PPow (UPrim2 PRange (UPrim1 PToDb UVar)
-                                        (UPair (ULit (-90)) (ULit (-50))))
-                           (ULit 4))
-             def
-    el "br" $ return ()
-    text "G"
-    gFunc <- funExprInput (UPrim2 PPow (UPrim2 PRange (UPrim1 PToDb UVar)
-                                        (UPair (ULit (-90)) (ULit (-50))))
-                           (ULit 4))
-             def
-    el "br" $ return ()
+    (rFunc, gFunc, bFunc) <- elClass "div" "colors" $ do
+      text "R"
+      rFunc <- funExprInput (UPrim2 PPow (UPrim2 PRange (UPrim1 PToDb UVar)
+                                          (UPair (ULit (-90)) (ULit (-50))))
+                             (ULit 4))
+              def
+      el "br" $ return ()
+      text "G"
+      gFunc <- funExprInput (UPrim2 PPow (UPrim2 PRange (UPrim1 PToDb UVar)
+                                          (UPair (ULit (-90)) (ULit (-50))))
+                             (ULit 4))
+               def
+      el "br" $ return ()
 
-    text "B"
-    bFunc <- funExprInput (UPrim2 PPow (UPrim2 PRange (UPrim1 PToDb UVar)
-                                        (UPair (ULit (-90)) (ULit (-50))))
-                           (ULit 2))
-             def
-    el "br" $ return ()
+      text "B"
+      bFunc <- funExprInput (UPrim2 PPow (UPrim2 PRange (UPrim1 PToDb UVar)
+                                          (UPair (ULit (-90)) (ULit (-50))))
+                             (ULit 2))
+               def
+      el "br" $ return ()
+      return (rFunc, gFunc, bFunc)
 
-    let cFuncs = (,,) <$> rFunc <*> gFunc <*> bFunc -- $(qDyn [| ( $(unqDyn [|rFunc|]), $(unqDyn [|gFunc|]), $(unqDyn [|bFunc|])) |])
+    let cFuncs = (,,) <$> rFunc <*> gFunc <*> bFunc
 
 
     return (fullCochlea, c, cFuncs, ticks)
@@ -346,7 +339,7 @@ foreign import javascript unsafe "navigator.userAgent"
 foreign import javascript unsafe "navigator.mediaDevices.getUserMedia({'audio':true}).then(function(s){ mss = ($1).createMediaStreamSource(s); mss.connect($2); console.log('SUCCESS2');})"
   js_connectMic' :: AudioContext -> AudioNode -> IO ()
 
-foreign import javascript unsafe "if (window.location.protocol != 'https:') { window.location.href = 'https:' + window.location.href.substring(window.location.protocol.length) }"
+foreign import javascript unsafe "if (window.location.protocol == 'http:') { window.location.href = 'https:' + window.location.href.substring(window.location.protocol.length) }"
   js_forceHttps :: IO ()
 
 downsample :: forall t m a. MonadWidget t m => Behavior t Int -> Event t a -> m (Event t a)
