@@ -18,6 +18,8 @@ import Data.Time (getCurrentTime)
 import Data.Monoid
 import GHCJS.Foreign
 import GHCJS.Types
+import Data.Text (Text)
+import qualified Data.Text as T
 import qualified GHCJS.Types as T
 import GHCJS.Marshal
 import GHCJS.DOM
@@ -61,7 +63,7 @@ import Data.Map
 
 justButtonGroup :: (MonadWidget t m, Eq a, Show a)
                 => a
-                -> Dynamic t [(a,String)]
+                -> Dynamic t [(a,T.Text)]
                 -> WidgetConfig t (Maybe a)
                 -> m (Dynamic t a)
 justButtonGroup vDef btns cfg = do
@@ -74,10 +76,10 @@ funExprInput exp0 inConfig = mdo
   boxAttrs <- combineDyn
          (\ats e ->  ats <> "class" =: bool "expr expr-bad" "expr expr-good" (isJust e))
          (_textInputConfig_attributes inConfig) textExpr
-  eInp     <- textInput def { _textInputConfig_initialValue = pExp0
+  eInp     <- textInput def { _textInputConfig_initialValue = T.pack pExp0
                             , _textInputConfig_attributes   = boxAttrs
                             }
-  textExpr <- mapDyn (hush . parseUexp) (value eInp)
+  textExpr <- mapDyn (hush . parseUexp) (T.unpack <$> value eInp)
   outExp   <- holdDyn exp0 $ fmapMaybe id (updated textExpr)
   return outExp
 

@@ -16,7 +16,7 @@ import GHCJS.DOM.AudioNode
 import GHCJS.DOM.AudioContext
 import GHCJS.DOM.AnalyserNode
 import GHCJS.DOM.ConvolverNode
-import GHCJS.DOM.AudioBuffer
+import GHCJS.DOM.AudioBuffer hiding (getSampleRate)
 import GHCJS.Marshal
 import qualified JavaScript.Array as JA
 import WebAudio
@@ -69,21 +69,17 @@ gammaTone (GammaToneFilter n f b a) t =
 
 setImpulseResponse :: AudioContext -> CochlearFilter t m -> Filter -> Int -> IO ()
 setImpulseResponse ctx (CochlearFilter _ conv anyl _) filt nSamps = do
-  let freq = 44100 -- TODO: Magic number. Can get this from AudioContext maybe?
-      len = fromIntegral nSamps / freq
-  let samps = impulseResponse freq len filt
+  freq <- getSampleRate ctx
+  let len = fromIntegral nSamps / realToFrac freq
+      samps = impulseResponse (realToFrac freq) len filt
   sampVals <- traverse toJSVal samps
-  buf <- js_doublesToBuffer ctx (JA.fromList sampVals)
+  buf <- js_doublesToBuffer ctx (JA.fromList sampVals) (realToFrac freq)
   setBuffer conv (Just buf)
 
 
--- foreign import javascript unsafe
---   "$r = ($1).createBuffer(2,22050,44100); var c = new Float32Array($2); ($r).copyToChannel(c,0,0)"
---   js_doublesToBuffer :: AudioContext -> JA.JSArray -> IO AudioBuffer
-
 foreign import javascript unsafe
-  "$r = ($1).createBuffer(2,($2).length,44100); var d = ($r).getChannelData(0); for (var i = 0; i < ($2).length; i++) {d[i] = ($2)[i]; };"
-  js_doublesToBuffer :: AudioContext -> JA.JSArray -> IO AudioBuffer
+  "$r = ($1).createBuffer(2,($2).length,($3)); var d = ($r).getChannelData(0); for (var i = 0; i < ($2).length; i++) {d[i] = ($2)[i]; };"
+  js_doublesToBuffer :: AudioContext -> JA.JSArray -> Float -> IO AudioBuffer
 
 -- foreign import javascript unsafe
 --   "var buf = new Float32Array(($1).fftSize); ($1).getByteTimeDomainData(buf); $r = 0; buf.forEach(function(s){ $r = $r + s*s;}); $r = Math.sqrt($r)/buf.length"

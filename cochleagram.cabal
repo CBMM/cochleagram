@@ -22,7 +22,7 @@ library
                        Types
   -- other-modules:       
   -- other-extensions:    
-  build-depends:       base >=4.8 && <4.9,
+  build-depends:       base >=4.8 && <4.10,
                        arb-fft,
                        containers,
                        data-default,
@@ -55,5 +55,6 @@ executable cochleagram
                     reflex,
                     reflex-dom,
                     reflex-dom-contrib,
+                    text,
                     time,
                     transformers
