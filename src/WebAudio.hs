@@ -13,7 +13,7 @@ import qualified JavaScript.TypedArray as TA
 import JavaScript.TypedArray.Internal
 import GHCJS.Foreign
 import GHCJS.Marshal.Pure (pToJSVal, pFromJSVal)
-import GHCJS.DOM.Enums (PToJSVal(..), PFromJSVal(..))
+-- import GHCJS.DOM.Enums (PToJSVal(..), PFromJSVal(..))
 import GHCJS.Types
 import GHCJS.Marshal
 import GHCJS.DOM.AnalyserNode
@@ -25,7 +25,7 @@ import GHCJS.DOM.AudioListener
 import GHCJS.DOM.AudioNode
 import GHCJS.DOM.AudioParam
 import GHCJS.DOM.AudioProcessingEvent
-import GHCJS.DOM.AudioStreamTrack
+-- import GHCJS.DOM.AudioStreamTrack
 import GHCJS.DOM.AudioTrack
 import GHCJS.DOM.AudioTrackList
 import GHCJS.DOM.GainNode
@@ -52,10 +52,10 @@ oscillatorNode :: MonadWidget t m
                -> OscillatorNodeConfig t
                -> m OscillatorNode
 oscillatorNode ctx cfg = do
-  Just osc <- createOscillator ctx
-  Just p   <- getFrequency osc
+  osc <- createOscillator ctx
+  p   <- getFrequency osc
   performEvent_ (ffor (_oscillatorNodeConfig_setFrequency cfg)$ \f ->
-                   liftIO (setValue p (realToFrac f)))
+                   liftJSM (setValue p (realToFrac f)))
   return osc
 
 data GainConfig t = GainConfig {
@@ -68,11 +68,11 @@ gain :: MonadWidget t m
      -> GainConfig t
      -> m GainNode
 gain ctx cfg = do
-  Just g <- createGain ctx
-  Just p <- getGain g
-  liftIO $ setValue p (realToFrac (_gainConfig_initialGain cfg))
+  g <- createGain ctx
+  p <- getGain g
+  liftJSM $ setValue p (realToFrac (_gainConfig_initialGain cfg))
   performEvent_ (ffor (_gainConfig_setGain cfg)$ \f ->
-                  liftIO (setValue p (realToFrac f)))
+                  liftJSM (setValue p (realToFrac f)))
   return g
 
 data AnalyserNodeConfig t = AnalyserNodeConfig {
@@ -111,26 +111,26 @@ analyserNode :: MonadWidget t m
              -> m (Analyser t m)
 analyserNode ctx
   (AnalyserNodeConfig nFFT dnFFT minDB dminDB maxDB dmaxDB tau dtau) = do
-    Just a <- liftIO $ createAnalyser ctx
+    a <- liftJSM $ createAnalyser ctx
 
     setFftSize a (fromIntegral nFFT)
-    performEvent (ffor dnFFT $ \n -> liftIO (setFftSize a (fromIntegral n)))
+    performEvent (ffor dnFFT $ \n -> liftJSM (setFftSize a (fromIntegral n)))
 
     setMinDecibels a minDB
-    performEvent (ffor dminDB $ \m -> liftIO (setMinDecibels a m))
+    performEvent (ffor dminDB $ \m -> liftJSM (setMinDecibels a m))
 
     setMaxDecibels a maxDB
-    performEvent (ffor dmaxDB $ \m -> liftIO (setMaxDecibels a m))
+    performEvent (ffor dmaxDB $ \m -> liftJSM (setMaxDecibels a m))
 
     setSmoothingTimeConstant a tau
-    performEvent (ffor dtau $ \t -> liftIO (setSmoothingTimeConstant a t))
+    performEvent (ffor dtau $ \t -> liftJSM (setSmoothingTimeConstant a t))
 
     return $ Analyser a (getFreqFloat a) (getFreqByte a)
 
 getFreqFloat :: MonadWidget t m
              => AnalyserNode
              -> Event t () -> m (Event t D.Float32Array)
-getFreqFloat a e = performEvent $ ffor e $ \_ -> liftIO $ do
+getFreqFloat a e = performEvent $ ffor e $ \_ -> liftJSM $ do
   nSamp :: Int <- fromIntegral <$> getFrequencyBinCount a
   buffer <- js_createFloat32Array' nSamp
   getFloatFrequencyData a (Just buffer)
@@ -139,12 +139,13 @@ getFreqFloat a e = performEvent $ ffor e $ \_ -> liftIO $ do
 getFreqByte :: MonadWidget t m
              => AnalyserNode
              -> Event t () -> m (Event t Uint8Array)
-getFreqByte a e = performEvent $ ffor e $ \_ -> liftIO $ do
+getFreqByte a e = performEvent $ ffor e $ \_ -> liftJSM $ do
   nSamp  <- fromIntegral <$> getFrequencyBinCount a
   buffer <- js_createUint8Array' nSamp
   getByteFrequencyData a (Just buffer)
   return buffer
 
+#ifdef ghcjs_HOST_OS
 foreign import javascript unsafe "new Float32Array($1)"
   js_createFloat32Array' :: Int -> IO Float32Array
 
@@ -159,3 +160,9 @@ foreign import javascript unsafe "($1).length"
 
 foreign import javascript unsafe "new Uint8ClampedArray($1)"
   js_clampUint8Array :: Uint8Array -> IO Uint8ClampedArray
+#else
+js_createFloat32Array' = undefined
+js_createUint8Array' = undefined
+js_createUint8ClampedArray' = undefined
+js_clampUint8Array = undefined
+#endif

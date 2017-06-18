@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE JavaScriptFFI #-}
@@ -6,7 +7,7 @@
 
 module Cochlea where
 
-import Control.Monad.IO.Class (liftIO)
+-- import Control.Monad.IO.Class (liftJSM)
 import Data.Map
 import Data.Traversable
 import Reflex
@@ -67,7 +68,7 @@ gammaTone (GammaToneFilter n f b a) t =
   --      This seems weird. Fortunately gammatone impulse response
   --      is purely real. Right?
 
-setImpulseResponse :: AudioContext -> CochlearFilter t m -> Filter -> Int -> IO ()
+setImpulseResponse :: AudioContext -> CochlearFilter t m -> Filter -> Int -> JSM ()
 setImpulseResponse ctx (CochlearFilter _ conv anyl _) filt nSamps = do
   freq <- getSampleRate ctx
   let len = fromIntegral nSamps / realToFrac freq
@@ -77,6 +78,7 @@ setImpulseResponse ctx (CochlearFilter _ conv anyl _) filt nSamps = do
   setBuffer conv (Just buf)
 
 
+#ifdef ghcjs_HOST_OS
 foreign import javascript unsafe
   "$r = ($1).createBuffer(2,($2).length,($3)); var d = ($r).getChannelData(0); for (var i = 0; i < ($2).length; i++) {d[i] = ($2)[i]; };"
   js_doublesToBuffer :: AudioContext -> JA.JSArray -> Float -> IO AudioBuffer
@@ -85,9 +87,14 @@ foreign import javascript unsafe
 --   "var buf = new Float32Array(($1).fftSize); ($1).getByteTimeDomainData(buf); $r = 0; buf.forEach(function(s){ $r = $r + s*s;}); $r = Math.sqrt($r)/buf.length"
 --   js_getPower :: AnalyserNode -> IO Double
 
+
 foreign import javascript unsafe
   "var buf = new Uint8Array(($1).fftSize); ($1).getByteTimeDomainData(buf); $r = 0; for (var i = 0; i < ($1).fftSize; i++){ var s = (buf[i] - 127) * 0.003921; $r = $r + s*s;}; $r = Math.sqrt($r)/buf.length"
   js_getPower :: AnalyserNode -> IO Double
+#else
+js_doublesToBuffer = undefined
+js_getPower = undefined
+#endif
 
 
 
@@ -97,19 +104,19 @@ cochlearFilter :: MonadWidget t m
                -> CochlearFilterConfig t
                -> m (CochlearFilter t m)
 cochlearFilter ctx inputNode (CochlearFilterConfig filt nSamp) = mdo
-  Just convNode <- liftIO $ createConvolver ctx
-  Just anylNode <- liftIO $ createAnalyser  ctx
-  connect inputNode (Just convNode) 0 0
-  connect convNode  (Just anylNode) 0 0
+  convNode <- liftJSM $ createConvolver ctx
+  anylNode <- liftJSM $ createAnalyser  ctx
+  connect inputNode convNode (Just 0) (Just 0)
+  connect convNode  anylNode (Just 0) (Just 0)
   let getPower = do
         p <- js_getPower anylNode
         -- print $ "Power: " ++ show p
         return p
   pb         <- getPostBuild
-  filtParams <- combineDyn (,) filt nSamp
-  let cFilter = CochlearFilter ctx convNode anylNode (\reqs -> performEvent $ ffor reqs $ \() -> liftIO getPower)
-  _ <- performEvent $ ffor (updated nSamp) (\n -> liftIO (setFftSize (_cfAnalyserNode cFilter) (fromIntegral n)))
-  _ <- performEvent (ffor (leftmost [tagDyn filtParams pb , updated filtParams]) $ \(f,n) -> liftIO $ setImpulseResponse ctx cFilter f n)
+  let filtParams = zipDynWith (,) filt nSamp
+  let cFilter = CochlearFilter ctx convNode anylNode (\reqs -> performEvent $ ffor reqs $ \() -> liftJSM getPower)
+  _ <- performEvent $ ffor (updated nSamp) (\n -> liftJSM (setFftSize (_cfAnalyserNode cFilter) (fromIntegral n)))
+  _ <- performEvent (ffor (leftmost [tagPromptlyDyn filtParams pb , updated filtParams]) $ \(f,n) -> liftJSM $ setImpulseResponse ctx cFilter f n)
   return cFilter
 
 data CochleaConfig t = CochleaConfig
@@ -145,18 +152,19 @@ cochlea ctx inputNode (CochleaConfig rng drng n dn l dl f df) = do
   nfilts    <- holdDyn n   dn
   logspace  <- holdDyn l   dl
   bwFunc    <- holdDyn f   df
-  filtspecs <- $(qDyn [| freqSpace $(unqDyn [|frange|])
-                                   $(unqDyn [|nfilts|])
-                                   $(unqDyn [|logspace|])
-                                   $(unqDyn [|bwFunc|])
-                      |])
+  let filtspecs = freqSpace <$> frange <*> nfilts <*> logspace <*> bwFunc
+  -- filtspecs <- $(qDyn [| freqSpace $(unqDyn [|frange|])
+  --                                  $(unqDyn [|nfilts|])
+  --                                  $(unqDyn [|logspace|])
+  --                                  $(unqDyn [|bwFunc|])
+  --                     |])
   filts     <- listWithKey filtspecs $ \freq filt -> do
     cochlearFilter ctx inputNode
       CochlearFilterConfig { _cfcFilter = filt
                            , _cfcNSamples = constDyn 2048 }
 
   let getPowers reqs = performEvent $ ffor (tag (current filts) reqs) $ \cFilts ->
-        traverse (\cf -> liftIO (js_getPower $ _cfAnalyserNode cf)) cFilts
+        traverse (\cf -> liftJSM (js_getPower $ _cfAnalyserNode cf)) cFilts
 
   return (Cochlea getPowers filts)
 

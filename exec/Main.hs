@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE PackageImports #-}
 {-# LANGUAGE QuasiQuotes #-}
 
 module Main where
@@ -12,16 +13,20 @@ module Main where
 import Control.Applicative (liftA3)
 import Control.Monad (join, when)
 import Data.Bool (bool)
-import qualified Data.JSString as JS
+-- import qualified Data.JSString as JS
 import Data.Maybe (isJust)
+import qualified Data.Text as T
 import Data.Time (getCurrentTime)
 import Data.Monoid
 import GHCJS.Foreign
 import GHCJS.Types
+import GHCJS.DOM.CanvasRenderingContext2D (CanvasRenderingContext2D)
+import GHCJS.DOM.NavigatorID
+import qualified GHCJS.DOM.MediaDevices as MD
 import Data.Text (Text)
 import qualified Data.Text as T
-import qualified GHCJS.Types as T
-import GHCJS.Marshal
+-- import qualified GHCJS.Types as T
+-- import GHCJS.Marshal
 import GHCJS.DOM
 import GHCJS.DOM.AudioBuffer
 import GHCJS.DOM.AudioBufferCallback
@@ -31,11 +36,12 @@ import GHCJS.DOM.AudioListener
 import GHCJS.DOM.AudioNode
 import GHCJS.DOM.AudioParam
 import GHCJS.DOM.AudioProcessingEvent
-import GHCJS.DOM.AudioStreamTrack
+-- import GHCJS.DOM.AudioStreamTrack
 import GHCJS.DOM.AudioTrack
 import GHCJS.DOM.AudioTrackList
 import GHCJS.DOM.OscillatorNode
 import GHCJS.DOM.HTMLCanvasElement
+import GHCJS.DOM.HTMLCanvasElement as Canv
 import GHCJS.DOM.CanvasRenderingContext2D
 import GHCJS.DOM.ImageData
 import GHCJS.DOM.NavigatorUserMediaSuccessCallback
@@ -44,9 +50,10 @@ import GHCJS.DOM.Types hiding (Event)
 import GHCJS.DOM.Enums
 import GHCJS.DOM.Navigator
 import GHCJS.DOM.Window
-import qualified JavaScript.Web.Canvas as C
+-- import qualified JavaScript.Web.Canvas as C
 import qualified JavaScript.Array as JA
 import qualified JavaScript.Object as JO
+import System.Mem
 import qualified Text.PrettyPrint as Pretty
 
 import Control.Monad.IO.Class
@@ -133,9 +140,10 @@ main' = do
 
     c <- liftIO newAudioContext
 
-    g   <- gain c (GainConfig gain0 (updated gainCoef))
+    g    <- gain c (GainConfig gain0 (updated gainCoef))
+    gAud <- unsafeCastTo AudioNode g
 
-    fullCochlea <- cochlea c (castToAudioNode g)
+    fullCochlea <- cochlea c gAud
                    (CochleaConfig (100,5000) (updated filtsRange)
                     64 (updated nFilts)
                     True never
@@ -144,31 +152,41 @@ main' = do
     -- osc <- oscillatorNode c (OscillatorNodeConfig 440 freq)
 
     Just win <- liftIO currentWindow
-    Just nav <- liftIO $ getNavigator win
+    nav <- liftIO $ getNavigator win
     b <- liftIO $ toJSVal True
     myDict <- liftIO $ JO.create >>= \o -> JO.setProp "audio" b o >> return o
 
     mediaCallback <- liftIO $ newNavigatorUserMediaSuccessCallback $ \s -> do
-      case s of
-        Just stream -> do
-          Just src <- liftIO $ createMediaStreamSource c (Just stream)
-          liftIO $ connect (castToAudioNode src) (Just g) 0 0
-        Nothing -> liftIO (putStrLn "SUCCESS NOTHING")
+      -- case s of
+        -- Just stream -> do
+          src <- liftIO $ createMediaStreamSource c (s)
+          srcAud <- unsafeCastTo AudioNode src
+          liftIO $ connect srcAud (g) (Just 0) (Just 0)
+          -- liftIO $ connect (castToAudioNode src) (Just g) 0 0
+        -- Nothing -> liftIO (putStrLn "SUCCESS NOTHING")
 
-    failureCallback <- liftIO $ newNavigatorUserMediaErrorCallback $ \e -> do
-      case e of
-        Just err -> liftIO $ print'' err
-        Nothing -> liftIO (putStrLn "FAILURE NOTHING")
+    failureCallback <- liftIO $ newNavigatorUserMediaErrorCallback $ \e -> liftIO (print'' e)
+      -- case e of
+      --   Just err -> liftIO $ print'' err
+      --   Nothing -> liftIO (putStrLn "FAILURE NOTHING")
 
 
     liftIO $ do
-      Just dest <- getDestination c
-      nm <- js_userAgent
-      when ("Chrome" `JS.isInfixOf` nm)  $ putStrLn "Chrome" >>
-        webkitGetUserMedia nav (Just $ Dictionary (jsval myDict))
-        (Just mediaCallback) (Just failureCallback)
-      when ("Firefox" `JS.isInfixOf` nm) $ putStrLn "FF" >> js_connectMic' c (castToAudioNode g)
-      putStrLn "Test2"
+      dest <- getDestination c
+      -- nm <- getUserAgent (toNavigatorID nav)
+      devices <- getMediaDevices nav
+      um <- MD.getUserMedia devices (Just $ pFromJSVal $ jsval myDict) -- (Just $ Dictionary (jsval myDict))
+
+      js_connectMic' c gAud
+      -- Just dest <- getDestination c
+      -- nm <- getUserAgent
+      -- -- nm <- js_userAgent
+      -- putStrLn (show nm)
+      -- when ("Chrome" `T.isInfixOf` pFromJSVal nm)  $ putStrLn "Chrome" >>
+      --   webkitGetUserMedia nav (Just $ Dictionary (jsval myDict))
+      --   (Just mediaCallback) (Just failureCallback)
+      -- when ("Firefox" `T.isInfixOf` pFromJSVal nm) $ putStrLn "FF" >> js_connectMic' c gAud
+      -- putStrLn "Test2"
 
     el "br" $ return ()
 
@@ -214,7 +232,8 @@ main' = do
              def
     el "br" $ return ()
 
-    cFuncs <- $(qDyn [| ( $(unqDyn [|rFunc|]), $(unqDyn [|gFunc|]), $(unqDyn [|bFunc|])) |])
+    -- cFuncs <- $(qDyn [| ( $(unqDyn [|rFunc|]), $(unqDyn [|gFunc|]), $(unqDyn [|bFunc|])) |])
+    let cFuncs = (,,) <$> rFunc <*> gFunc <*> bFunc
 
 
     return (fullCochlea, c, cFuncs, ticks)
@@ -222,15 +241,19 @@ main' = do
 
 
   elClass "div" "coch-display" $ do
-    canvEl <- fmap (castToHTMLCanvasElement . _el_element . fst) $
+    canvEl <- unsafeCastTo HTMLCanvasElement =<< fmap (_element_raw . fst) (
               elAttr' "canvas" ("id" =: "canvas"
                                 <> "width" =: "200"
                                 <> "height" =: "128"
-                                <> "style" =: "height:256px;") $ return ()
-    ctx'' <- liftIO $ GHCJS.DOM.HTMLCanvasElement.getContext
-             canvEl ("2d" :: JSString)
-    Just ctx' :: Maybe CanvasRenderingContext2D <- liftIO $ fromJSVal ctx''
+                                <> "style" =: "height:256px;") $ return ())
 
+    -- ctx'' <- liftIO $ Canv.getContextUnsafe
+    --          canvEl ("2d" :: JSString)
+    -- Just ctx' :: Maybe CanvasRenderingContext2D <- liftIO $ fromJSVal ctx''
+
+    ctx' :: RenderingContext <- liftIO $ Canv.getContextUnsafe
+             canvEl ("2d" :: JSString) ([] :: [()])
+    ctx2d <- unsafeCastTo CanvasRenderingContext2D ctx'
 
     let applyExpr e xs = Prelude.map (flip uevalD e) xs
 
@@ -244,6 +267,7 @@ main' = do
 
     performEvent (ffor cochleaColors $ \(rs,gs,bs) -> liftIO $ do
                     when (length rs > 0) $ do
+                      -- performMinorGC
                       let toClamped :: [Double] -> IO Uint8ClampedArray
                           toClamped xs = (js_makeUint8ClampedArray . JA.fromList) =<< traverse (toJSVal . (* 255)) xs
                       r <- toClamped rs
@@ -251,9 +275,9 @@ main' = do
                       b <- toClamped bs
                       img <- js_zip_colors_magic_height r g b
                       let l = 128 * 4 :: Int -- length rs * 4
-                      imgData <- newImageData (Just img) 1 (fromIntegral $ l `div` 4)
-                      shiftAppendColumn ctx'
-                      putImageData ctx' (Just imgData) 199 0)
+                      imgData <- newImageData (img) 1 (Just $ fromIntegral $ l `div` 4)
+                      shiftAppendColumn ctx2d
+                      putImageData ctx2d imgData 199 0)
 
     el "br" $ return ()
 
@@ -272,20 +296,20 @@ hush (Right r) = Just r
 
 draw :: CanvasRenderingContext2D -> IO ()
 draw ctx = do
-  setFillStyle ctx (Just $ CanvasStyle $ jsval ("rgba(255,255,255,0.05)" :: JSString))
+  setFillStyle ctx (CanvasStyle $ jsval ("rgba(255,255,255,0.05)" :: JSString))
   fillRect ctx 0 0 300 150
 
 shiftAppendColumn :: CanvasRenderingContext2D -> IO ()
 shiftAppendColumn ctx = do
-  Just d <- getImageData ctx 1 0 200 128
-  putImageData ctx (Just d) 0 0
+  d <- getImageData ctx 1 0 200 128
+  putImageData ctx d 0 0
 
-squeezeAppendColumn :: CanvasRenderingContext2D -> HTMLCanvasElement -> IO ()
-squeezeAppendColumn ctx canv = do
-  save ctx
-  scale ctx (199/200) 1
-  drawImageFromCanvas ctx (Just canv) 0 0
-  restore ctx
+-- squeezeAppendColumn :: CanvasRenderingContext2D -> HTMLCanvasElement -> IO ()
+-- squeezeAppendColumn ctx canv = do
+--   save ctx
+--   scale ctx (199/200) 1
+--   drawImageFromCanvas ctx (Just canv) 0 0
+--   restore ctx
 
 foreign import javascript unsafe "$r = new Uint8ClampedArray($1)"
   js_makeUint8ClampedArray :: JA.JSArray -> IO Uint8ClampedArray
