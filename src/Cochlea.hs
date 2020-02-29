@@ -35,8 +35,10 @@ data Filter = FGammaTone GammaToneFilter    -- ^ Standard gammatone filter
             | FImpulse   (Double -> Double) -- ^ Arbitrary impulse response
             | FFreq      (Double -> Double) -- ^ Arbitrary frequency response
 
+
 instance Show Filter where
   show (FGammaTone g) = show g
+
 
 data CochlearFilterConfig t = CochlearFilterConfig {
     _cfcFilter   :: Dynamic t Filter
@@ -50,14 +52,16 @@ data CochlearFilter t m = CochlearFilter {
   , _cfGetPower        :: Event t () -> m (Event t Double)
   }
 
+
 impulseResponse :: Double -> Double -> Filter -> [Double]
-impulseResponse _ _ (FFreq _) = error "FFreq filter not implemented"
 impulseResponse freq buffLen filt = Prelude.map sample sampTimes
   where nSamps    = floor $ buffLen * freq
         sampTimes = Prelude.map ((/ freq) . realToFrac) [0..nSamps - 1]
         sample = case filt of
           FImpulse f   -> f
           FGammaTone f -> gammaTone f
+          FFreq _ -> error "FFreq filter not implemented"
+
 
 gammaTone :: GammaToneFilter -> Double -> Double
 gammaTone (GammaToneFilter n f b a) t =
@@ -67,27 +71,22 @@ gammaTone (GammaToneFilter n f b a) t =
   --      This seems weird. Fortunately gammatone impulse response
   --      is purely real. Right?
 
+
 setImpulseResponse :: AudioContext -> CochlearFilter t m -> Filter -> Int -> IO ()
 setImpulseResponse ctx (CochlearFilter _ conv anyl _) filt nSamps = do
-  let freq = 44100 -- TODO: Magic number. Can get this from AudioContext maybe?
+  freq <- realToFrac <$> GHCJS.DOM.AudioContext.getSampleRate ctx
+  let -- freq = 44100 -- TODO: Magic number. Can get this from AudioContext maybe?
       len = fromIntegral nSamps / freq
   let samps = impulseResponse freq len filt
   sampVals <- traverse toJSVal samps
-  buf <- js_doublesToBuffer ctx (JA.fromList sampVals)
+  buf <- js_doublesToBuffer ctx (JA.fromList sampVals) freq
   setBuffer conv (Just buf)
 
 
--- foreign import javascript unsafe
---   "$r = ($1).createBuffer(2,22050,44100); var c = new Float32Array($2); ($r).copyToChannel(c,0,0)"
---   js_doublesToBuffer :: AudioContext -> JA.JSArray -> IO AudioBuffer
-
 foreign import javascript unsafe
-  "$r = ($1).createBuffer(2,($2).length,44100); var d = ($r).getChannelData(0); for (var i = 0; i < ($2).length; i++) {d[i] = ($2)[i]; };"
-  js_doublesToBuffer :: AudioContext -> JA.JSArray -> IO AudioBuffer
+  "$r = ($1).createBuffer(2,($2).length,($3)); var d = ($r).getChannelData(0); for (var i = 0; i < ($2).length; i++) {d[i] = ($2)[i]; };"
+  js_doublesToBuffer :: AudioContext -> JA.JSArray -> Double -> IO AudioBuffer
 
--- foreign import javascript unsafe
---   "var buf = new Float32Array(($1).fftSize); ($1).getByteTimeDomainData(buf); $r = 0; buf.forEach(function(s){ $r = $r + s*s;}); $r = Math.sqrt($r)/buf.length"
---   js_getPower :: AnalyserNode -> IO Double
 
 foreign import javascript unsafe
   "var buf = new Uint8Array(($1).fftSize); ($1).getByteTimeDomainData(buf); $r = 0; for (var i = 0; i < ($1).fftSize; i++){ var s = (buf[i] - 127) * 0.003921; $r = $r + s*s;}; $r = Math.sqrt($r)/buf.length"
@@ -101,19 +100,19 @@ cochlearFilter :: MonadWidget t m
                -> CochlearFilterConfig t
                -> m (CochlearFilter t m)
 cochlearFilter ctx inputNode (CochlearFilterConfig filt nSamp) = mdo
-  Just convNode <- liftIO $ createConvolver ctx
-  Just anylNode <- liftIO $ createAnalyser  ctx
-  connect inputNode (Just convNode) 0 0
-  connect convNode  (Just anylNode) 0 0
+  convNode <- liftIO $ createConvolver ctx
+  anylNode <- liftIO $ createAnalyser  ctx
+  connect inputNode convNode (Just 0) (Just 0)
+  connect convNode  anylNode (Just 0) (Just 0)
   let getPower = do
         p <- js_getPower anylNode
         -- print $ "Power: " ++ show p
         return p
   pb         <- getPostBuild
-  filtParams <- combineDyn (,) filt nSamp
+  let filtParams = (,) <$> filt <*> nSamp
   let cFilter = CochlearFilter ctx convNode anylNode (\reqs -> performEvent $ ffor reqs $ \() -> liftIO getPower)
   _ <- performEvent $ ffor (updated nSamp) (\n -> liftIO (setFftSize (_cfAnalyserNode cFilter) (fromIntegral n)))
-  _ <- performEvent (ffor (leftmost [tagDyn filtParams pb , updated filtParams]) $ \(f,n) -> liftIO $ setImpulseResponse ctx cFilter f n)
+  _ <- performEvent (ffor (leftmost [tag (current filtParams) pb , updated filtParams]) $ \(f,n) -> liftIO $ setImpulseResponse ctx cFilter f n)
   return cFilter
 
 data CochleaConfig t = CochleaConfig
@@ -127,10 +126,18 @@ data CochleaConfig t = CochleaConfig
   , _cochleaConfig_change_bwFunction  :: Event t UExp
   }
 
+data CochloaConfig' = CochleaConfig'
+  { _cc_freqRange :: (Double, Double)
+  , _cc_nFreo     :: Int
+  , _cc_logSpace  :: Bool
+  , _ccBwFunction :: UExp
+  } deriving (Show)
+
 data Cochlea t m = Cochlea
   { _cochlea_getPowerData :: Event t () -> m (Event t (Map Double Double))
   , _cochlea_filters      :: Dynamic t (Map Double (CochlearFilter t m))
   }
+
 
 freqSpace :: (Double, Double) -> Int -> Bool -> UExp -> Map Double Filter
 freqSpace (freq1,freqN) n True bwFunc =
@@ -142,6 +149,7 @@ freqSpace (freq1,freqN) n True bwFunc =
         inds  = Prelude.map (\f -> log f / dFr) freqs
         bws   = Prelude.map (flip uevalD bwFunc) freqs
 
+
 cochlea :: MonadWidget t m => AudioContext -> AudioNode -> CochleaConfig t -> m (Cochlea t m)
 cochlea ctx inputNode (CochleaConfig rng drng n dn l dl f df) = do
 
@@ -149,11 +157,7 @@ cochlea ctx inputNode (CochleaConfig rng drng n dn l dl f df) = do
   nfilts    <- holdDyn n   dn
   logspace  <- holdDyn l   dl
   bwFunc    <- holdDyn f   df
-  filtspecs <- $(qDyn [| freqSpace $(unqDyn [|frange|])
-                                   $(unqDyn [|nfilts|])
-                                   $(unqDyn [|logspace|])
-                                   $(unqDyn [|bwFunc|])
-                      |])
+  let filtspecs = freqSpace <$> frange <*> nfilts <*> logspace <*> bwFunc
   filts     <- listWithKey filtspecs $ \freq filt -> do
     cochlearFilter ctx inputNode
       CochlearFilterConfig { _cfcFilter = filt
@@ -164,3 +168,10 @@ cochlea ctx inputNode (CochleaConfig rng drng n dn l dl f df) = do
 
   return (Cochlea getPowers filts)
 
+-- buildCochlea
+--   :: MonadWidget t m
+--   => AudioContext
+--   -> AudioNode
+--   -> CochleaConfig'
+--   -> Cochlea'
+-- buildCochlea = undefined

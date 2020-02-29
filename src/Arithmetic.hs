@@ -1,4 +1,6 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Arithmetic where
 
@@ -6,13 +8,20 @@ import Control.Applicative hiding ((<|>), (<*>))
 import Data.Bifunctor
 import Data.Functor
 import Data.Monoid ((<>))
+import qualified Data.Text as Text
 import Debug.Trace
 import Text.Parsec
+import Data.Bool (bool)
+import Data.Maybe (isJust, fromMaybe)
 import Text.Parsec.Language
 import Text.Parsec.Expr
 import Text.Parsec.String
+import Reflex (Dynamic, holdDyn, fmapMaybe, updated)
 import Text.Parsec.Token   hiding (parens)
--- import Text.Attoparsec
+import Reflex.Dom ((=:))
+import Reflex.Dom.Old (MonadWidget)
+import Reflex.Dom.Widget (def, el, text, value)
+import Reflex.Dom.Widget.Input (textInput, TextInputConfig(..))
 
 import Text.PrettyPrint ((<+>))
 import qualified Text.PrettyPrint as Pretty
@@ -152,70 +161,58 @@ lit = do
     Nothing -> return $ ULit v
     Just _  -> return (ULit $ negate v)
 
--- op2 :: Parser Prim2
--- op2 = try (char '+' $> PSum)
---   <|> try (char '-' $> PDiff)
---   <|> try (char '*' $> PProd)
---   <|> try (char '/' $> PDiv)
 
--- binarySequence :: Parser [UExp]
--- binarySequence =
---   many1 (try parens <|> try prim1 <|> try var <|> lit)
-
--- op1 :: Parser Prim1
--- op1 = try (char '-'       $> PNegate)
---   <|> try (string "exp10" $> PExp10)
---   <|> try (string "exp"   $> PExpE)
---   <|> try (string "log10" $> PLog10)
---   <|> try (string "log"   $> PLogE)
-
--- prim2 :: Parser UExp
--- prim2 = do
---   a <- expr
---   spaces
---   o <- op2
---   spaces
---   b <- expr
---   return (UPrim2 o a b)
-
--- -- negate :: Parser UExp
--- -- negate = do
--- --   char 
-
--- prim1 :: Parser UExp
--- prim1 = try noSpaceParens <|> spaceLitOrVar
---   where noSpaceParens = do
---           o <- op1
---           e <- parens
---           return (UPrim1 o e)
---         spaceLitOrVar = do
---           o <- op1
---           many1 (char ' ')
---           l <- var <|> lit
---           return (UPrim1 o l)
-
--- var :: Parser UExp
--- var = char 'x' >> pure UVar
+funExprInput :: MonadWidget t m => UExp -> m (Dynamic t UExp)
+funExprInput exp0 = mdo
+  let pExp0 = Pretty.render $ pp exp0
+  -- let inputConfig = def
+  let boxAttrs =
+         (\ats e ->  ats <> "class" =: bool "expr expr-bad" "expr expr-good" (isJust e))
+         <$> _textInputConfig_attributes def <*> textExpr
+  eInp <- textInput def { _textInputConfig_initialValue = Text.pack pExp0
+                        , _textInputConfig_attributes   = boxAttrs
+                        }
+  let textExpr = hush . parseUexp . Text.unpack <$> value eInp
+  outExp   <- holdDyn exp0 $ fmapMaybe id (updated textExpr)
+  el "br" (return ())
+  return outExp
 
 
+defaultRedExpr = UPrim2 PPow (UPrim2 PRange (UPrim1 PToDb UVar)
+                                        (UPair (ULit (-90)) (ULit (-50))))
+                           (ULit 4)
+defaultGreenExpr = UPrim2 PPow (UPrim2 PRange (UPrim1 PToDb UVar)
+                                        (UPair (ULit (-100)) (ULit (-70))))
+                           (ULit 4)
+defaultBlueExpr = UPrim2 PPow (UPrim2 PRange (UPrim1 PToDb UVar)
+                                        (UPair (ULit (-90)) (ULit (-50))))
+                           (ULit 2)
 
 
+colorMappings :: MonadWidget t m => m (Dynamic t (UExp, UExp, UExp))
+colorMappings = do
+  rFunc <- text "R" >> funExprInput defaultRedExpr
+  gFunc <- text "G" >> funExprInput defaultGreenExpr
+  bFunc <- text "B" >> funExprInput defaultBlueExpr
+  return $ (,,) <$> rFunc <*> gFunc <*> bFunc
 
+    -- text "R"
+    -- rFunc <- funExprInput
+    --          def
+    -- el "br" $ return ()
+    -- text "G"
+    -- gFunc <- funExprInput ()
+    --          def
+    -- el "br" $ return ()
 
--- data ArithExpr a where
---   ALit   :: Double -> ArithExpr Double
---   AIVar  :: ArithExpr Double
---   APrim2 :: Prim2
---          -> ArithExpr Double
---          -> ArithExpr Double
---          -> ArithExpr Double
---   APrim1 :: Prim1 -> ArithExpr Double -> ArithExpr Double
---   AParens :: ArithExpr a -> ArithExpr a
+    -- text "B"
+    -- bFunc <- funExprInput ()
+    --          def
+    -- el "br" $ return ()
 
--- eval :: Double -> ArithExpr a -> Double
--- eval _ (ALit r)        = r
--- eval x AIVar           = x
--- eval x (APrim2 p2 a b) = evalPrim2 p2 (eval x a) (eval x b)
--- eval x (APrim1 p1 a)   = evalPrim1 p1 (eval x a)
--- eval x (AParens a)     = eval x a
+    -- let cFuncs = (,,) <$> rFunc <*> gFunc <*> bFunc
+    -- -- cFuncs <- $(qDyn [| ( $(unqDyn [|rFunc|]), $(unqDyn [|gFunc|]), $(unqDyn [|bFunc|])) |])
 
+hush :: Either l r -> Maybe r
+hush (Left _)  = Nothing
+hush (Right r) = Just r

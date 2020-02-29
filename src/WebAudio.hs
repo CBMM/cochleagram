@@ -1,50 +1,55 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE EmptyDataDecls #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE CPP                      #-}
+{-# LANGUAGE EmptyDataDecls           #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
+{-# LANGUAGE ScopedTypeVariables      #-}
 #ifdef __GHCJS__
-{-# LANGUAGE JavaScriptFFI #-}
+{-# LANGUAGE JavaScriptFFI            #-}
 #endif
 
 module WebAudio where
 
-import qualified JavaScript.Array as JA
-import qualified JavaScript.TypedArray as TA
-import JavaScript.TypedArray.Internal
-import GHCJS.Foreign
-import GHCJS.Marshal.Pure (pToJSVal, pFromJSVal)
-import GHCJS.DOM.Enums (PToJSVal(..), PFromJSVal(..))
-import GHCJS.Types
-import GHCJS.Marshal
-import GHCJS.DOM.AnalyserNode
-import GHCJS.DOM.AudioBuffer hiding (getGain)
-import GHCJS.DOM.AudioBufferCallback
-import GHCJS.DOM.AudioContext
-import GHCJS.DOM.AudioDestinationNode
-import GHCJS.DOM.AudioListener
-import GHCJS.DOM.AudioNode
-import GHCJS.DOM.AudioParam
-import GHCJS.DOM.AudioProcessingEvent
-import GHCJS.DOM.AudioStreamTrack
-import GHCJS.DOM.AudioTrack
-import GHCJS.DOM.AudioTrackList
-import GHCJS.DOM.GainNode
-import GHCJS.DOM.OscillatorNode
+import           GHCJS.Foreign
+import qualified JavaScript.Array               as JA
+import qualified JavaScript.TypedArray          as TA
+import           JavaScript.TypedArray.Internal
 
-import Control.Monad
-import Control.Monad.IO.Class
-import Data.Default
-import GHCJS.DOM
-import GHCJS.DOM.Types hiding (Event(..))
-import qualified GHCJS.DOM.Types as D
-import GHCJS.Types
-import Reflex
-import Reflex.Dom hiding (setValue)
-import Reflex.Dom.Class
+import           GHCJS.Types
+
+import           GHCJS.DOM.AnalyserNode
+import           GHCJS.DOM.AudioBuffer          hiding (getGain)
+import           GHCJS.DOM.AudioBufferCallback
+import           GHCJS.DOM.AudioContext
+import           GHCJS.DOM.AudioDestinationNode
+import           GHCJS.DOM.AudioListener
+import           GHCJS.DOM.AudioNode
+import           GHCJS.DOM.AudioParam
+import           GHCJS.DOM.AudioProcessingEvent
+-- import GHCJS.DOM.AudioStreamTrack
+import           GHCJS.DOM.AudioTrack
+import           GHCJS.DOM.AudioTrackList
+import           GHCJS.DOM.GainNode
+import           GHCJS.DOM.OscillatorNode
+
+#ifdef __GHCJS__
+import           GHCJS.DOM.Enums                (PFromJSVal (..), PToJSVal (..))
+import           GHCJS.Marshal
+import           GHCJS.Marshal.Pure             (pFromJSVal, pToJSVal)
+#endif
+
+import           Control.Monad
+import           Control.Monad.IO.Class
+import           Data.Default
+import           GHCJS.DOM
+import           GHCJS.DOM.Types                hiding (Event (..))
+import qualified GHCJS.DOM.Types                as D
+import           GHCJS.Types
+import           Reflex
+import           Reflex.Dom                     hiding (setValue)
+import           Reflex.Dom.Class
 
 data OscillatorNodeConfig t = OscillatorNodeConfig {
     _oscillatorNodeConfig_initialFrequency :: Double
-  , _oscillatorNodeConfig_setFrequency :: Event t Double
+  , _oscillatorNodeConfig_setFrequency     :: Event t Double
   }
 
 oscillatorNode :: MonadWidget t m
@@ -52,15 +57,15 @@ oscillatorNode :: MonadWidget t m
                -> OscillatorNodeConfig t
                -> m OscillatorNode
 oscillatorNode ctx cfg = do
-  Just osc <- createOscillator ctx
-  Just p   <- getFrequency osc
+  osc <- createOscillator ctx
+  p   <- getFrequency osc
   performEvent_ (ffor (_oscillatorNodeConfig_setFrequency cfg)$ \f ->
                    liftIO (setValue p (realToFrac f)))
   return osc
 
 data GainConfig t = GainConfig {
    _gainConfig_initialGain :: Double
- , _gainConfig_setGain :: Event t Double
+ , _gainConfig_setGain     :: Event t Double
  }
 
 gain :: MonadWidget t m
@@ -68,8 +73,8 @@ gain :: MonadWidget t m
      -> GainConfig t
      -> m GainNode
 gain ctx cfg = do
-  Just g <- createGain ctx
-  Just p <- getGain g
+  g <- createGain ctx
+  p <- getGain g
   liftIO $ setValue p (realToFrac (_gainConfig_initialGain cfg))
   performEvent_ (ffor (_gainConfig_setGain cfg)$ \f ->
                   liftIO (setValue p (realToFrac f)))
@@ -111,7 +116,7 @@ analyserNode :: MonadWidget t m
              -> m (Analyser t m)
 analyserNode ctx
   (AnalyserNodeConfig nFFT dnFFT minDB dminDB maxDB dmaxDB tau dtau) = do
-    Just a <- liftIO $ createAnalyser ctx
+    a <- liftIO $ createAnalyser ctx
 
     setFftSize a (fromIntegral nFFT)
     performEvent (ffor dnFFT $ \n -> liftIO (setFftSize a (fromIntegral n)))
