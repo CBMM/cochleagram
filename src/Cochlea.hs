@@ -16,7 +16,7 @@ import GHCJS.DOM.AudioNode
 import GHCJS.DOM.AudioContext
 import GHCJS.DOM.AnalyserNode
 import GHCJS.DOM.ConvolverNode
-import GHCJS.DOM.AudioBuffer
+import GHCJS.DOM.AudioBuffer hiding (getSampleRate)
 import GHCJS.Marshal
 import qualified JavaScript.Array as JA
 import WebAudio

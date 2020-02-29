@@ -23,6 +23,7 @@ library
   -- other-modules:       
   -- other-extensions:    
   build-depends:       base >=4.8 && <4.13,
+
                        arb-fft,
                        containers,
                        data-default,
